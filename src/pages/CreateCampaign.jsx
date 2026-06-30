@@ -275,7 +275,7 @@ export default function CreateCampaign() {
       link: 'Learn about Sponsored Brands',
       slides: [<SBMockup key="sb1" />, <SBMockup key="sb2" />],
       route: '/create-campaign/sponsored-brands',
-      comingSoon: true,
+      comingSoon: false,
     },
   ];
 

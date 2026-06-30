@@ -93,20 +93,35 @@ const initialNegativeKeywords = [
   { id: 'nk3', campaignId: 'c1', adGroupId: 'ag1', keyword: 'used', matchType: 'Phrase', level: 'Ad Group' },
 ];
 
+const initialSbAds = [
+  {
+    id: 'sba1',
+    campaignId: 'c2',
+    name: 'Brand Defense Ad',
+    status: 'Enabled',
+    adFormat: 'product-collection',
+    brandName: 'SoundMax',
+    headline: 'Premium Audio for Every Moment',
+    landingPage: 'store',
+    products: ['B0CF244HDV', 'B0CF24MSGB', 'B0CF277SZN'],
+    metrics: { impressions: 28900, clicks: 820, spend: 28.70, orders: 41, sales: 1120.00 }
+  }
+];
+
 const initialPortfolios = [
   { id: 'p1', name: 'Main Products Portfolio', budget: 100, budgetType: 'Monthly', status: 'Active' },
   { id: 'p2', name: 'Competitor Targeting Portfolio', budget: 30, budgetType: 'Monthly', status: 'Active' },
 ];
 
 const initialProducts = [
-  { asin: 'B0CF244HDV', sku: 'SM-PRO-BLK', name: 'SoundMax Pro Wireless Noise Cancelling Headphones | 40Hr Battery | Hi-Res Audio | Foldable Over-Ear Design', price: 2499, imageType: 'over-ear-black', category: 'Electronics', rating: 4.5, reviews: 2847, status: 'Out of stock', brand: 'SoundMax' },
-  { asin: 'B0CF24MSGB', sku: 'SM-LITE-WHT', name: 'SoundMax Lite True Wireless Earbuds | Active Noise Cancellation | IPX5 Waterproof | 30Hr Total Battery', price: 1799, imageType: 'earbuds-white', category: 'Electronics', rating: 4.8, reviews: 1203, status: 'Out of stock', brand: 'SoundMax' },
-  { asin: 'B0CF277SZN', sku: 'SM-SPORT-BLU', name: 'SoundMax Sport Wireless Earbuds | Ear Hook Design | IPX7 Waterproof | 8Hr Playback | Deep Bass', price: 999, imageType: 'sport-blue', category: 'Electronics', rating: 4.3, reviews: 876, status: 'Out of stock', brand: 'SoundMax' },
+  { asin: 'B0CF244HDV', sku: 'SM-PRO-BLK', name: 'SoundMax Pro Wireless Noise Cancelling Headphones | 40Hr Battery | Hi-Res Audio | Foldable Over-Ear Design', price: 2499, imageType: 'over-ear-black', category: 'Electronics', rating: 4.5, reviews: 2847, status: 'In stock', brand: 'SoundMax' },
+  { asin: 'B0CF24MSGB', sku: 'SM-LITE-WHT', name: 'SoundMax Lite True Wireless Earbuds | Active Noise Cancellation | IPX5 Waterproof | 30Hr Total Battery', price: 1799, imageType: 'earbuds-white', category: 'Electronics', rating: 4.8, reviews: 1203, status: 'In stock', brand: 'SoundMax' },
+  { asin: 'B0CF277SZN', sku: 'SM-SPORT-BLU', name: 'SoundMax Sport Wireless Earbuds | Ear Hook Design | IPX7 Waterproof | 8Hr Playback | Deep Bass', price: 999, imageType: 'sport-blue', category: 'Electronics', rating: 4.3, reviews: 876, status: 'In stock', brand: 'SoundMax' },
   { asin: 'B0CF23X3HB', sku: 'SM-STD-BLK', name: 'SoundMax Studio Headphones | Professional Monitor | 50mm Drivers | Detachable Cable | Foldable', price: 3299, imageType: 'studio-gray', category: 'Electronics', rating: 4.1, reviews: 431, status: 'In stock', brand: 'SoundMax' },
   { asin: 'B0CF234LT4', sku: 'SM-KIDS-RED', name: 'SoundMax Kids Volume Limited Headphones | 85dB Safe | Soft Ear Cushions | Adjustable Headband | Wired', price: 699, imageType: 'kids-red', category: 'Electronics', rating: 4.4, reviews: 612, status: 'In stock', brand: 'SoundMax' },
   { asin: 'B0CF2X8MNP', sku: 'SM-GAME-BLK', name: 'SoundMax Pro Gaming Headset | 7.1 Surround Sound | Noise Cancelling Mic | RGB | PC PS5 Xbox Compatible', price: 1999, imageType: 'gaming-rgb', category: 'Electronics', rating: 4.2, reviews: 389, status: 'In stock', brand: 'SoundMax' },
   { asin: 'B0CF2Y9QRS', sku: 'SM-OPEN-SLV', name: 'SoundMax Open Back Audiophile Headphones | 250 Ohm | Velour Earpads | Hi-Fi Reference Grade Sound', price: 4999, imageType: 'open-back', category: 'Electronics', rating: 4.6, reviews: 218, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF2Z1TUV', sku: 'SM-NECK-GLD', name: 'SoundMax Neckband Wireless Earphones | Magnetic Clasp | 15Hr Battery | Dual Device Connect | Voice Assist', price: 899, imageType: 'neckband-gold', category: 'Electronics', rating: 4.0, reviews: 934, status: 'Out of stock', brand: 'SoundMax' },
+  { asin: 'B0CF2Z1TUV', sku: 'SM-NECK-GLD', name: 'SoundMax Neckband Wireless Earphones | Magnetic Clasp | 15Hr Battery | Dual Device Connect | Voice Assist', price: 899, imageType: 'neckband-gold', category: 'Electronics', rating: 4.0, reviews: 934, status: 'In stock', brand: 'SoundMax' },
 ];
 
 const generateChartData = () => {
@@ -138,6 +153,7 @@ export const useStore = create(
       negativeKeywords: initialNegativeKeywords,
       portfolios: initialPortfolios,
       products: initialProducts,
+      sbAds: initialSbAds,
       chartData: generateChartData(),
       dateRange: '30',
       selectedCampaignIds: [],
@@ -192,6 +208,14 @@ export const useStore = create(
       })),
       deleteNegativeKeyword: (id) => set((state) => ({
         negativeKeywords: state.negativeKeywords.filter(nk => nk.id !== id)
+      })),
+
+      // SB Ad Actions
+      addSbAd: (ad) => set((state) => ({
+        sbAds: [...(state.sbAds || []), { ...ad, id: `sba${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
+      })),
+      updateSbAd: (id, updates) => set((state) => ({
+        sbAds: (state.sbAds || []).map(a => a.id === id ? { ...a, ...updates } : a)
       })),
 
       // Portfolio Actions

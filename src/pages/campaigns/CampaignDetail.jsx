@@ -45,6 +45,7 @@ export default function CampaignDetail() {
   const addKeywords = useStore(s => s.addKeywords);
   const updateKeyword = useStore(s => s.updateKeyword);
   const deleteKeyword = useStore(s => s.deleteKeyword);
+  const sbAds = useStore(s => s.sbAds || []);
 
   const campaign = campaigns.find(c => c.id === id);
   const campaignAdGroups = adGroups.filter(ag => ag.campaignId === id);
@@ -164,15 +165,28 @@ export default function CampaignDetail() {
     setPlacements(p => p.map((pl, i) => i === idx ? { ...pl, adjustment: Math.min(900, Math.max(0, adj)) } : pl));
   };
 
-  const tabs = [
-    { key: 'adgroups', label: 'Ad groups' },
-    { key: 'targeting', label: 'Targeting' },
-    { key: 'negatives', label: 'Negative targeting' },
-    { key: 'bidding', label: 'Campaign bidding strategy' },
-    { key: 'placements', label: 'Placements' },
-    { key: 'settings', label: 'Settings' },
-    { key: 'history', label: 'History' },
-  ];
+  const isSB = campaign?.type === 'Sponsored Brands';
+  const resolvedTab = isSB && activeTab === 'adgroups' ? 'ads' : activeTab;
+  const campaignSbAds = sbAds.filter(a => a.campaignId === id);
+
+  const tabs = isSB
+    ? [
+        { key: 'ads', label: 'Ads' },
+        { key: 'targeting', label: 'Targeting' },
+        { key: 'negatives', label: 'Negative targeting' },
+        { key: 'bidding', label: 'Campaign bidding strategy' },
+        { key: 'settings', label: 'Settings' },
+        { key: 'history', label: 'History' },
+      ]
+    : [
+        { key: 'adgroups', label: 'Ad groups' },
+        { key: 'targeting', label: 'Targeting' },
+        { key: 'negatives', label: 'Negative targeting' },
+        { key: 'bidding', label: 'Campaign bidding strategy' },
+        { key: 'placements', label: 'Placements' },
+        { key: 'settings', label: 'Settings' },
+        { key: 'history', label: 'History' },
+      ];
 
   const agCtr = (ag) => ag.metrics.impressions ? (ag.metrics.clicks / ag.metrics.impressions * 100) : 0;
   const agCpc = (ag) => ag.metrics.clicks ? (ag.metrics.spend / ag.metrics.clicks) : 0;
@@ -295,14 +309,65 @@ export default function CampaignDetail() {
       {/* Tabs */}
       <div className="tabs" style={{ marginBottom: 0 }}>
         {tabs.map(t => (
-          <button key={t.key} className={`tab ${activeTab === t.key ? 'active' : ''}`} onClick={() => setActiveTab(t.key)}>
+          <button key={t.key} className={`tab ${resolvedTab === t.key ? 'active' : ''}`} onClick={() => setActiveTab(t.key)}>
             {t.label}
           </button>
         ))}
       </div>
 
+      {/* ── ADS TAB (Sponsored Brands only) ── */}
+      {resolvedTab === 'ads' && (
+        <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
+          <div className="table-toolbar">
+            <div className="toolbar-left">
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{campaignSbAds.length} ad{campaignSbAds.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          {campaignSbAds.length === 0 ? (
+            <div className="empty-state" style={{ padding: '40px 20px' }}>
+              No ads found for this campaign. Launch the campaign to create ads.
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Ad name</th>
+                  <th>Status</th>
+                  <th>Format</th>
+                  <th>Headline</th>
+                  <th>Landing page</th>
+                  <th>Products</th>
+                  <th>Impressions</th>
+                  <th>Clicks</th>
+                  <th>Spend</th>
+                  <th>Orders</th>
+                  <th>Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaignSbAds.map(ad => (
+                  <tr key={ad.id}>
+                    <td style={{ fontWeight: 500 }}>{ad.name || ad.brandName + ' — ' + (ad.headline?.slice(0, 30) || 'Ad')}</td>
+                    <td><StatusBadge status={ad.status} /></td>
+                    <td style={{ textTransform: 'capitalize' }}>{(ad.adFormat || '').replace(/-/g, ' ')}</td>
+                    <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.headline}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{(ad.landingPage || '').replace(/-/g, ' ')}</td>
+                    <td>{(ad.products || []).length} product{(ad.products || []).length !== 1 ? 's' : ''}</td>
+                    <td>{formatNumber(ad.metrics?.impressions ?? 0)}</td>
+                    <td>{formatNumber(ad.metrics?.clicks ?? 0)}</td>
+                    <td>{formatCurrency(ad.metrics?.spend ?? 0)}</td>
+                    <td>{formatNumber(ad.metrics?.orders ?? 0)}</td>
+                    <td>{formatCurrency(ad.metrics?.sales ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {/* ── AD GROUPS TAB ── */}
-      {activeTab === 'adgroups' && (
+      {resolvedTab === 'adgroups' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
           <div className="table-toolbar">
             <div className="toolbar-left">
@@ -404,7 +469,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── TARGETING TAB ── */}
-      {activeTab === 'targeting' && (
+      {resolvedTab === 'targeting' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
           <div className="table-toolbar">
             <div className="toolbar-left">
@@ -554,7 +619,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── NEGATIVE TARGETING TAB ── */}
-      {activeTab === 'negatives' && (
+      {resolvedTab === 'negatives' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
           <div className="neg-kw-tabs-row">
             <span className="neg-kw-label">Negative keywords</span>
@@ -645,7 +710,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── CAMPAIGN BIDDING STRATEGY TAB ── */}
-      {activeTab === 'bidding' && (
+      {resolvedTab === 'bidding' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none', padding: 24 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Campaign bidding strategy</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>
@@ -723,7 +788,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── PLACEMENTS TAB ── */}
-      {activeTab === 'placements' && (
+      {resolvedTab === 'placements' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
           <div className="table-toolbar">
             <span className="toolbar-title">Placements performance</span>
@@ -786,7 +851,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── SETTINGS TAB ── */}
-      {activeTab === 'settings' && (
+      {resolvedTab === 'settings' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none', padding: 24 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Campaign settings</h3>
           <div className="settings-grid">
@@ -846,7 +911,7 @@ export default function CampaignDetail() {
       )}
 
       {/* ── HISTORY TAB ── */}
-      {activeTab === 'history' && (
+      {resolvedTab === 'history' && (
         <div className="table-card" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: 'none' }}>
           <div className="table-toolbar">
             <span className="toolbar-title">Change history</span>
