@@ -700,10 +700,12 @@ body { font-family: 'Amazon Ember', 'Helvetica Neue', Arial, sans-serif; font-si
 .ccs-sugg-val { color: var(--text-muted); font-size: 13px; }
 .ccs-bid-field-row { display: flex; align-items: center; gap: 12px; }
 .ccs-bid-label { font-size: 13px; font-weight: 600; width: 90px; }
-.ccs-bid-input-wrap { display: flex; align-items: center; border: 1px solid #a0a0a0; border-radius: 3px; overflow: hidden; }
-.ccs-bid-prefix { padding: 0 8px; background: #f5f5f5; border-right: 1px solid #a0a0a0; font-size: 13px; color: var(--text-muted); height: 34px; display: flex; align-items: center; }
-.ccs-bid-suffix { padding: 0 8px; background: #f5f5f5; border-left: 1px solid #a0a0a0; font-size: 13px; color: var(--text-muted); height: 34px; display: flex; align-items: center; }
-.ccs-bid-input { border: none; outline: none; padding: 7px 8px; font-size: 13px; width: 100px; }
+.ccs-bid-input-wrap { display: flex; align-items: center; border: 1px solid #a0a0a0; border-radius: 6px; overflow: hidden; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+.ccs-bid-input-wrap:focus-within { border-color: #0073bb; box-shadow: 0 0 0 3px rgba(0, 115, 187, 0.15); }
+.ccs-bid-input-wrap:hover { border-color: #767676; }
+.ccs-bid-prefix { padding: 0 10px; background: #f7f8fa; border-right: 1px solid #d5d9d9; font-size: 14px; font-weight: 600; color: #555; height: 38px; display: flex; align-items: center; }
+.ccs-bid-suffix { padding: 0 10px; background: #f7f8fa; border-left: 1px solid #d5d9d9; font-size: 13px; color: var(--text-muted); height: 38px; display: flex; align-items: center; }
+.ccs-bid-input { border: none; outline: none; padding: 8px 10px; font-size: 14px; font-weight: 600; color: #0f1111; width: 100px; background: transparent; }
 .ccs-bid-input:disabled { background: #f5f5f5; color: #aaa; }
 .ccs-pct-wrap { display: flex; align-items: center; }
 
@@ -844,6 +846,12 @@ body { font-family: 'Amazon Ember', 'Helvetica Neue', Arial, sans-serif; font-si
 .ccs-bid-mode-option.selected strong { color: var(--amazon-blue); }
 .ccs-bid-mode-option strong { font-size: 13px; font-weight: 700; color: #111; }
 .ccs-bid-mode-option span { font-size: 12px; color: #666; }
+
+/* Cost-control lock tooltip (shown instead of the bid-mode dropdown when Cost control is on) */
+.ccs-bid-lock-tooltip { position: absolute; top: calc(100% + 8px); left: 0; z-index: 200; background: #232f3e; color: white; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); width: 320px; padding: 14px 30px 14px 14px; font-size: 13px; line-height: 1.5; }
+.ccs-bid-lock-tooltip p { margin: 0; }
+.ccs-bid-lock-tooltip-close { position: absolute; top: 10px; right: 10px; background: none; border: none; color: white; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0.8; }
+.ccs-bid-lock-tooltip-close:hover { opacity: 1; }
 
 /* Add a Rule modal */
 .ccs-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: flex-start; justify-content: flex-end; }

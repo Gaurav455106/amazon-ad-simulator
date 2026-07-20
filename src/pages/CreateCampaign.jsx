@@ -288,7 +288,7 @@ export default function CreateCampaign() {
     link: 'Learn about Display',
     slides: [<DisplayMockup key="d1" />, <DisplayMockup key="d2" />],
     route: '/create-campaign/display',
-    comingSoon: true,
+    comingSoon: false,
   };
 
   const handleCreate = (type) => {

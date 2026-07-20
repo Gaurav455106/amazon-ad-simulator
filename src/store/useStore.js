@@ -165,7 +165,7 @@ export const useStore = create(
 
       // Campaign Actions
       addCampaign: (campaign) => set((state) => ({
-        campaigns: [...state.campaigns, { ...campaign, id: `c${Date.now()}`, createdAt: new Date().toISOString().split('T')[0], metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 } }]
+        campaigns: [...state.campaigns, { id: `c${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 }, ...campaign, createdAt: new Date().toISOString().split('T')[0] }]
       })),
       updateCampaign: (id, updates) => set((state) => ({
         campaigns: state.campaigns.map(c => c.id === id ? { ...c, ...updates } : c)
