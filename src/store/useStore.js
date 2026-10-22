@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { applyTick } from '../utils/liveTick';
 import { localISODate } from '../utils/dateRanges';
+import { BRAND_NAME, DEMO_PRODUCTS, SEED_KEYWORDS } from '../data/demoAccount';
 
 // ── User management (plain localStorage, not in Zustand) ──
 export const getUsers = () => {
-  try { return JSON.parse(localStorage.getItem('amazon-ads-users') || '["SoundMax"]'); }
-  catch { return ['SoundMax']; }
+  try { return JSON.parse(localStorage.getItem('amazon-ads-users') || JSON.stringify([BRAND_NAME])); }
+  catch { return [BRAND_NAME]; }
 };
-export const getCurrentUser = () => localStorage.getItem('amazon-ads-current-user') || 'SoundMax';
+export const getCurrentUser = () => localStorage.getItem('amazon-ads-current-user') || BRAND_NAME;
 export const saveUserToList = (name) => {
   const users = getUsers();
   if (!users.includes(name)) {
@@ -16,6 +17,33 @@ export const saveUserToList = (name) => {
   }
   localStorage.setItem('amazon-ads-current-user', name);
 };
+
+// The default account used to be "SoundMax". Hand its saved data to the new default
+// account once, so existing campaigns survive the switch (the v5 migration then converts them).
+const LEGACY_DEFAULT_USER = 'SoundMax';
+export function adoptLegacyDefaultUser(storage) {
+  const legacyKey = `amazon-ads-store__${LEGACY_DEFAULT_USER}`;
+  const newKey = `amazon-ads-store__${BRAND_NAME}`;
+  const current = storage.getItem('amazon-ads-current-user');
+  if (current && current !== LEGACY_DEFAULT_USER) return;
+  const legacy = storage.getItem(legacyKey);
+  const canMove = Boolean(legacy) && !storage.getItem(newKey);
+  if (canMove) {
+    storage.setItem(newKey, legacy);
+    storage.removeItem(legacyKey);
+  }
+  // If both saves exist, keep the old account listed so its data stays reachable via "Switch account".
+  const keepLegacy = Boolean(legacy) && !canMove;
+  try {
+    const users = JSON.parse(storage.getItem('amazon-ads-users') || '[]');
+    const renamed = [...new Set([BRAND_NAME, ...users.filter(u => keepLegacy || u !== LEGACY_DEFAULT_USER)])];
+    storage.setItem('amazon-ads-users', JSON.stringify(renamed.length ? renamed : [BRAND_NAME]));
+  } catch {
+    storage.setItem('amazon-ads-users', JSON.stringify([BRAND_NAME]));
+  }
+  storage.setItem('amazon-ads-current-user', BRAND_NAME);
+}
+if (typeof localStorage !== 'undefined') adoptLegacyDefaultUser(localStorage);
 
 // ── Per-user storage adapter ──
 const userStorage = createJSONStorage(() => ({
@@ -29,7 +57,7 @@ const daysAgo = (n) => localISODate(new Date(Date.now() - n * 86400000));
 const initialCampaigns = [
   {
     id: 'c1',
-    name: 'Summer Sale - Sponsored Products',
+    name: 'Festive Sale - Sponsored Products',
     type: 'Sponsored Products',
     status: 'Enabled',
     targetingType: 'Manual',
@@ -40,7 +68,7 @@ const initialCampaigns = [
     biddingStrategy: 'Dynamic bids - down only',
     portfolioId: 'p1',
     createdAt: daysAgo(75),
-    metrics: { impressions: 45320, clicks: 1240, spend: 10752.00, orders: 62, sales: 103977.50 }
+    metrics: { impressions: 45320, clicks: 1240, spend: 10752.00, orders: 62, sales: 21918.00 }
   },
   {
     id: 'c2',
@@ -55,7 +83,7 @@ const initialCampaigns = [
     biddingStrategy: 'Fixed bid',
     portfolioId: 'p1',
     createdAt: daysAgo(60),
-    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 }
+    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 110, sales: 41800.00 }
   },
   {
     id: 'c3',
@@ -78,33 +106,35 @@ const initialCampaigns = [
       { type: 'Audience', name: 'Purchases remarketing · Related to advertised products · 30 days', bid: 10.8 },
       { type: 'Audience', name: 'Purchases remarketing · Advertised products · 30 days', bid: 10.8 },
     ],
-    sdCreative: { adFormat: 'image', products: ['B0CF23X3HB'] },
+    sdCreative: { adFormat: 'image', products: ['B0D3M4ZNKS'] },
     portfolioId: 'p2',
     createdAt: daysAgo(45),
-    metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 13475.00 }
+    metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 8091.00 }
   }
 ];
 
 const initialAdGroups = [
-  { id: 'ag1', products: ['B0CF244HDV', 'B0CF24MSGB'], campaignId: 'c1', name: 'Core Keywords', status: 'Enabled', defaultBid: 9.00, metrics: { impressions: 28000, clicks: 780, spend: 6748.00, orders: 40, sales: 66000.00 } },
-  { id: 'ag2', products: ['B0CF277SZN'], campaignId: 'c1', name: 'Long Tail', status: 'Enabled', defaultBid: 5.40, metrics: { impressions: 17320, clicks: 460, spend: 4004.00, orders: 22, sales: 37977.50 } },
-  { id: 'ag3', products: ['B0CF244HDV', 'B0CF24MSGB', 'B0CF277SZN'], campaignId: 'c2', name: 'Brand Terms', status: 'Enabled', defaultBid: 7.20, metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 } },
-  { id: 'ag4', products: ['B0CF23X3HB'], campaignId: 'c3', name: 'Competitor ASINs', status: 'Paused', defaultBid: 10.80, metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 13475.00 } },
+  { id: 'ag1', products: ['B0BSXC1Z63', 'B09J578NDM'], campaignId: 'c1', name: 'Core Keywords', status: 'Enabled', defaultBid: 9.00, metrics: { impressions: 28000, clicks: 780, spend: 6748.00, orders: 40, sales: 15340.00 } },
+  { id: 'ag2', products: ['B0DFML8557'], campaignId: 'c1', name: 'Long Tail', status: 'Enabled', defaultBid: 5.40, metrics: { impressions: 17320, clicks: 460, spend: 4004.00, orders: 22, sales: 6578.00 } },
+  { id: 'ag3', products: ['B0BSXC1Z63', 'B09J578NDM', 'B0DFML8557'], campaignId: 'c2', name: 'Brand Terms', status: 'Enabled', defaultBid: 7.20, metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 110, sales: 41800.00 } },
+  { id: 'ag4', products: ['B0D3M4ZNKS'], campaignId: 'c3', name: 'Competitor ASINs', status: 'Paused', defaultBid: 10.80, metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 8091.00 } },
 ];
 
+const seedKeyword = (id, adGroupId, campaignId, [keyword, matchType, bid, suggestedBid], status, metrics) =>
+  ({ id, adGroupId, campaignId, keyword, matchType, bid, status, suggestedBid, metrics });
 const initialKeywords = [
-  { id: 'k1', adGroupId: 'ag1', campaignId: 'c1', keyword: 'wireless headphones', matchType: 'Exact', bid: 10.20, status: 'Enabled', suggestedBid: 11.04, metrics: { impressions: 12000, clicks: 380, spend: 3192.00, orders: 20, sales: 34100.00 } },
-  { id: 'k2', adGroupId: 'ag1', campaignId: 'c1', keyword: 'bluetooth headphones', matchType: 'Phrase', bid: 8.40, status: 'Enabled', suggestedBid: 9.36, metrics: { impressions: 9500, clicks: 240, spend: 2184.00, orders: 13, sales: 21450.00 } },
-  { id: 'k3', adGroupId: 'ag1', campaignId: 'c1', keyword: 'noise cancelling', matchType: 'Broad', bid: 6.60, status: 'Enabled', suggestedBid: 7.20, metrics: { impressions: 6500, clicks: 160, spend: 1372.00, orders: 7, sales: 10450.00 } },
-  { id: 'k4', adGroupId: 'ag2', campaignId: 'c1', keyword: 'best wireless headphones for running', matchType: 'Phrase', bid: 5.40, status: 'Enabled', suggestedBid: 6.00, metrics: { impressions: 3200, clicks: 95, spend: 896.00, orders: 8, sales: 13200.00 } },
-  { id: 'k5', adGroupId: 'ag2', campaignId: 'c1', keyword: 'affordable noise cancelling headphones', matchType: 'Broad', bid: 4.80, status: 'Paused', suggestedBid: 5.40, metrics: { impressions: 2100, clicks: 58, spend: 588.00, orders: 4, sales: 6600.00 } },
-  { id: 'k6', adGroupId: 'ag3', campaignId: 'c2', keyword: 'SoundMax headphones', matchType: 'Exact', bid: 7.20, status: 'Enabled', suggestedBid: 7.80, metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 } },
+  seedKeyword('k1', 'ag1', 'c1', SEED_KEYWORDS.core[0], 'Enabled', { impressions: 12000, clicks: 380, spend: 3192.00, orders: 20, sales: 8300.00 }),
+  seedKeyword('k2', 'ag1', 'c1', SEED_KEYWORDS.core[1], 'Enabled', { impressions: 9500, clicks: 240, spend: 2184.00, orders: 13, sales: 4590.00 }),
+  seedKeyword('k3', 'ag1', 'c1', SEED_KEYWORDS.core[2], 'Enabled', { impressions: 6500, clicks: 160, spend: 1372.00, orders: 7, sales: 2450.00 }),
+  seedKeyword('k4', 'ag2', 'c1', SEED_KEYWORDS.longTail[0], 'Enabled', { impressions: 3200, clicks: 95, spend: 896.00, orders: 8, sales: 2392.00 }),
+  seedKeyword('k5', 'ag2', 'c1', SEED_KEYWORDS.longTail[1], 'Paused', { impressions: 2100, clicks: 58, spend: 588.00, orders: 4, sales: 1196.00 }),
+  seedKeyword('k6', 'ag3', 'c2', SEED_KEYWORDS.brand[0], 'Enabled', { impressions: 28900, clicks: 820, spend: 8036.00, orders: 110, sales: 41800.00 }),
 ];
 
 const initialNegativeKeywords = [
   { id: 'nk1', campaignId: 'c1', adGroupId: null, keyword: 'cheap', matchType: 'Broad', level: 'Campaign' },
   { id: 'nk2', campaignId: 'c1', adGroupId: null, keyword: 'free', matchType: 'Exact', level: 'Campaign' },
-  { id: 'nk3', campaignId: 'c1', adGroupId: 'ag1', keyword: 'used', matchType: 'Phrase', level: 'Ad Group' },
+  { id: 'nk3', campaignId: 'c1', adGroupId: 'ag1', keyword: 'recipe', matchType: 'Phrase', level: 'Ad Group' },
 ];
 
 const initialSbAds = [
@@ -114,11 +144,11 @@ const initialSbAds = [
     name: 'Brand Defense Ad',
     status: 'Enabled',
     adFormat: 'product-collection',
-    brandName: 'SoundMax',
-    headline: 'Premium Audio for Every Moment',
+    brandName: BRAND_NAME,
+    headline: 'Snack smarter with real dry fruits',
     landingPage: 'store',
-    products: ['B0CF244HDV', 'B0CF24MSGB', 'B0CF277SZN'],
-    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 }
+    products: ['B0BSXC1Z63', 'B09J578NDM', 'B0DFML8557'],
+    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 110, sales: 41800.00 }
   }
 ];
 
@@ -127,16 +157,7 @@ const initialPortfolios = [
   { id: 'p2', name: 'Competitor Targeting Portfolio', budget: 30, budgetType: 'Monthly', status: 'Active' },
 ];
 
-const initialProducts = [
-  { asin: 'B0CF244HDV', sku: 'SM-PRO-BLK', name: 'SoundMax Pro Wireless Noise Cancelling Headphones | 40Hr Battery | Hi-Res Audio | Foldable Over-Ear Design', price: 2499, imageType: 'over-ear-black', category: 'Electronics', rating: 4.5, reviews: 2847, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF24MSGB', sku: 'SM-LITE-WHT', name: 'SoundMax Lite True Wireless Earbuds | Active Noise Cancellation | IPX5 Waterproof | 30Hr Total Battery', price: 1799, imageType: 'earbuds-white', category: 'Electronics', rating: 4.8, reviews: 1203, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF277SZN', sku: 'SM-SPORT-BLU', name: 'SoundMax Sport Wireless Earbuds | Ear Hook Design | IPX7 Waterproof | 8Hr Playback | Deep Bass', price: 999, imageType: 'sport-blue', category: 'Electronics', rating: 4.3, reviews: 876, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF23X3HB', sku: 'SM-STD-BLK', name: 'SoundMax Studio Headphones | Professional Monitor | 50mm Drivers | Detachable Cable | Foldable', price: 3299, imageType: 'studio-gray', category: 'Electronics', rating: 4.1, reviews: 431, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF234LT4', sku: 'SM-KIDS-RED', name: 'SoundMax Kids Volume Limited Headphones | 85dB Safe | Soft Ear Cushions | Adjustable Headband | Wired', price: 699, imageType: 'kids-red', category: 'Electronics', rating: 4.4, reviews: 612, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF2X8MNP', sku: 'SM-GAME-BLK', name: 'SoundMax Pro Gaming Headset | 7.1 Surround Sound | Noise Cancelling Mic | RGB | PC PS5 Xbox Compatible', price: 1999, imageType: 'gaming-rgb', category: 'Electronics', rating: 4.2, reviews: 389, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF2Y9QRS', sku: 'SM-OPEN-SLV', name: 'SoundMax Open Back Audiophile Headphones | 250 Ohm | Velour Earpads | Hi-Fi Reference Grade Sound', price: 4999, imageType: 'open-back', category: 'Electronics', rating: 4.6, reviews: 218, status: 'In stock', brand: 'SoundMax' },
-  { asin: 'B0CF2Z1TUV', sku: 'SM-NECK-GLD', name: 'SoundMax Neckband Wireless Earphones | Magnetic Clasp | 15Hr Battery | Dual Device Connect | Voice Assist', price: 899, imageType: 'neckband-gold', category: 'Electronics', rating: 4.0, reviews: 934, status: 'In stock', brand: 'SoundMax' },
-];
+const initialProducts = DEMO_PRODUCTS;
 
 const generateChartData = () => {
   const data = [];
@@ -172,6 +193,34 @@ export function ensureAdGroupsForAllCampaigns(state) {
     created.find(ag => ag.campaignId === campaignId)?.id || adGroups.find(ag => ag.campaignId === campaignId)?.id || null;
   const keywords = (state.keywords || []).map(k => (k.adGroupId ? k : { ...k, adGroupId: firstAdGroupOf(k.campaignId) }));
   return { ...state, adGroups: [...adGroups, ...created], keywords };
+}
+
+/** v5: the demo account moved from the made-up SoundMax headphones to Farmley's real products. */
+const LEGACY_ASIN_MAP = {
+  B0CF244HDV: 'B0BSXC1Z63', B0CF24MSGB: 'B09J578NDM', B0CF277SZN: 'B0DFML8557', B0CF23X3HB: 'B0D3M4ZNKS',
+  B0CF234LT4: 'B0CJY8F1DG', B0CF2X8MNP: 'B0D4M8QBJJ', B0CF2Y9QRS: 'B0BS8RDYBC', B0CF2Z1TUV: 'B09LD3ZB96',
+};
+const remapAsins = (list) => (Array.isArray(list) ? list.map(a => LEGACY_ASIN_MAP[a] || a) : list);
+const replaceSeed = (items, seed) => {
+  const seedIds = new Set(seed.map(x => x.id));
+  return [...seed, ...(items || []).filter(x => !seedIds.has(x.id))];
+};
+
+/**
+ * Replaces the seed campaigns, ad groups, keywords and ads with the Farmley versions,
+ * keeps everything a student created, and points their product references at the new ASINs.
+ */
+export function migrateToFarmley(state) {
+  const remapCampaign = (c) => (c.sdCreative ? { ...c, sdCreative: { ...c.sdCreative, products: remapAsins(c.sdCreative.products) } } : c);
+  return {
+    ...state,
+    products: DEMO_PRODUCTS,
+    campaigns: replaceSeed(state.campaigns, initialCampaigns).map(remapCampaign),
+    adGroups: replaceSeed(state.adGroups, initialAdGroups).map(ag => ({ ...ag, products: remapAsins(ag.products) })),
+    keywords: replaceSeed(state.keywords, initialKeywords),
+    negativeKeywords: replaceSeed(state.negativeKeywords, initialNegativeKeywords),
+    sbAds: replaceSeed(state.sbAds, initialSbAds).map(ad => ({ ...ad, products: remapAsins(ad.products) })),
+  };
 }
 
 // ── Change history (what the console's History pages show) ──
@@ -226,7 +275,7 @@ export const useStore = create(
       consoleRange: { preset: 'last7', from: null, to: null },
       selectedCampaignIds: [],
       notifications: [
-        { id: 'n1', type: 'warning', message: 'Campaign "Summer Sale" is running low on daily budget', time: '2 hours ago', read: false },
+        { id: 'n1', type: 'warning', message: 'Campaign "Festive Sale" is running low on daily budget', time: '2 hours ago', read: false },
         { id: 'n2', type: 'info', message: 'New search term report is available', time: '5 hours ago', read: false },
         { id: 'n3', type: 'success', message: 'Bid optimization applied to 3 campaigns', time: '1 day ago', read: true },
       ],
@@ -357,8 +406,11 @@ export const useStore = create(
     {
       name: 'amazon-ads-store',
       storage: userStorage,
-      version: 4,
-      migrate: (persisted, version) => (version < 4 ? ensureAdGroupsForAllCampaigns(persisted) : persisted),
+      version: 5,
+      migrate: (persisted, version) => {
+        const v4 = version < 4 ? ensureAdGroupsForAllCampaigns(persisted) : persisted;
+        return version < 5 ? migrateToFarmley(v4) : v4;
+      },
       partialize: (state) => {
         // eslint-disable-next-line no-unused-vars
         const { currentUserName, switchUser, ...rest } = state;

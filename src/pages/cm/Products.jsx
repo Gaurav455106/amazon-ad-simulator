@@ -86,7 +86,7 @@ export default function Products() {
                     <td><button type="button" className="cx-tool-btn" aria-label="Expand" onClick={() => setExpanded(e => ({ ...e, [p.asin]: !isOpen }))}>{isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button></td>
                     <td>
                       <div className="prod-row">
-                        <ProductImage imageType={p.imageType} size={44} />
+                        <ProductImage product={p} size={44} />
                         <div className="prod-row-text">
                           <span className="cx-link prod-title">{p.name}</span>
                           <Stars rating={p.rating} reviews={p.reviews} /> <span className="cx-sub">Price may vary by location</span>

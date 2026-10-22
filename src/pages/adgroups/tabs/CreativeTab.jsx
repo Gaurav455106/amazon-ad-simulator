@@ -20,7 +20,7 @@ export default function CreativeTab({ campaign, adGroup }) {
             const p = products.find(x => x.asin === asin);
             return (
               <div key={asin} className="prod-row">
-                <ProductImage imageType={p?.imageType} size={44} />
+                <ProductImage product={p} size={44} />
                 <span className="prod-row-text">{p?.name || asin}<span className="cx-sub">ASIN: {asin}</span></span>
               </div>
             );

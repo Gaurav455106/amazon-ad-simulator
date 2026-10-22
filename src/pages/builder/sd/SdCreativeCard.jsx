@@ -21,7 +21,7 @@ function AdTile({ size, brand, products, creative }) {
         : (
           <div className="sd-ad-visual">
             {creative.logo && <Logo brand={brand} size={isWide ? Math.min(size.h - 10, 34) : 36} />}
-            {creative.imageOn ? <span className="sd-ad-lifestyle" /> : products.slice(0, 2).map(x => <ProductImage key={x.asin} imageType={x.imageType} size={isWide ? Math.min(size.h - 10, 34) : 40} />)}
+            {creative.imageOn ? <span className="sd-ad-lifestyle" /> : products.slice(0, 2).map(x => <ProductImage key={x.asin} product={x} size={isWide ? Math.min(size.h - 10, 34) : 40} />)}
           </div>
         )}
       <div className="sd-ad-copy">

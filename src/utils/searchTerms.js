@@ -1,11 +1,7 @@
 import { withDerived } from './performance';
+import { SEARCH_TERM_EXPANSIONS as EXPANSIONS } from '../data/demoAccount';
 
-const EXPANSIONS = {
-  'wireless headphones': ['wireless headphones for gym', 'wireless headphones noise cancelling', 'wireless over ear headphones'],
-  'bluetooth headphones': ['bluetooth headphones with mic', 'bluetooth headphones for tv', 'bluetooth over ear headphones'],
-  'noise cancelling': ['noise cancelling headphones office', 'noise cancelling earbuds', 'active noise cancelling'],
-};
-const FALLBACK = [(k) => k, (k) => `${k} for men`, (k) => (k.startsWith('best ') ? `${k} online` : `best ${k}`), (k) => `${k} under 2000`];
+const FALLBACK = [(k) => k, (k) => `${k} combo`, (k) => (k.startsWith('best ') ? `${k} online` : `best ${k}`), (k) => `${k} under 500`];
 const BASE_KEYS = ['impressions', 'clicks', 'spend', 'orders', 'sales'];
 
 const shareWeight = (term) => 1 + (term.length % 7) / 3;

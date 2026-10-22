@@ -52,7 +52,7 @@ export function validateSpDraft(d) {
   if (d.targetingType === 'Auto') {
     if (d.autoBidMode === 'groups') {
       const on = d.autoGroups.filter(g => g.on);
-      if (on.length === 0) errors.push('Turn on at least one targeting group.');
+      if (on.length === 0) errors.push('A minimum of one targeting group is required.');
       if (on.some(g => !validBid(g.bid))) errors.push(`Each targeting group needs a bid of at least ₹${MIN_BID}.00.`);
     } else if (!validBid(d.defaultBid)) {
       errors.push(`Enter a default bid of at least ₹${MIN_BID}.00.`);

@@ -458,3 +458,34 @@
 .sbk-added > span { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; line-height: 18px; }
 .sbk-added small { color: #565959; font-size: 11px; }
 .sbk-added .ng-x { margin-top: 8px; }
+
+/* ── Automatic targeting groups (measured on the console, Oct 2026) ── */
+.ccs-root .ccs-targeting-groups-table { margin-top: 8px; border: none; border-left: 1px solid #b9bcbf; border-radius: 0; padding-left: 16px; max-width: 730px; overflow: visible; }
+.ccs-root .ccs-tg-header { grid-template-columns: 1fr 324px 136px; padding: 0 0 6px; background: none; border: none; font-size: 15px; font-weight: 700; color: var(--c-heading); align-items: center; }
+.ccs-root .ccs-tg-row { grid-template-columns: 1fr 324px 136px; padding: 14px 0; border-bottom: 1px solid #d5d9d9; font-size: 14px; color: var(--c-heading); }
+.ccs-root .ccs-tg-row:last-child { border-bottom: none; }
+.ccs-root .ccs-tg-col-group { gap: 12px; }
+.ccs-root .ccs-tg-sugg-price { font-size: 14px; font-weight: 400; color: #0053ca; }
+.ccs-root .ccs-tg-sugg-price.is-applied { color: var(--c-heading); cursor: default; text-decoration: none; }
+.ccs-root .ccs-tg-sugg-range { font-size: 14px; color: var(--c-heading); }
+.ccs-root .ccs-tg-row.is-off .ccs-tg-col-group span,
+.ccs-root .ccs-tg-row.is-off .ccs-tg-sugg-range { color: #676b6f; }
+.ccs-root .ccs-tg-row.is-off .ccs-tg-sugg-price { color: #676b6f; cursor: not-allowed; text-decoration: none; }
+.ccs-root .ccs-tg-row.is-off .ccs-bid-input-wrap { background: #f5f3ef; border-color: #d5d9d9; }
+.ccs-root .ccs-tg-row.is-off .ccs-bid-prefix,
+.ccs-root .ccs-tg-row.is-off .ccs-bid-input:disabled { background: transparent; color: #676b6f; cursor: not-allowed; }
+.ccs-root .ccs-tg-col-bid .ccs-bid-input-wrap { max-width: 104px; }
+.ccs-tg-note { margin: 12px 0 0; font-size: 13px; color: #2d3239; }
+
+/* Toggle: navy with a check when on, grey when off. */
+.ccs-root .ccs-toggle { width: 40px; height: 20px; border-radius: 10px; }
+.ccs-root .ccs-toggle.on { background: #1d608f; }
+.ccs-root .ccs-toggle.off { background: #8c8f93; }
+.ccs-root .ccs-toggle.on .ccs-toggle-knob { left: 22px; }
+.ccs-toggle-check { position: absolute; left: 5px; top: 4px; width: 12px; height: 12px; }
+
+/* "Suggested bid for regular days": disabled until a special event is within 45 days. */
+.sbb-wrap { position: relative; display: inline-flex; }
+.sbb-select { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: none; border-radius: 4px; background: #f5f3ef; color: #676b6f; font-size: 13px; font-weight: 400; pointer-events: none; }
+.sbb-tip { position: absolute; bottom: calc(100% + 8px); left: -40px; z-index: 30; width: 420px; padding: 12px 40px 12px 16px; border-radius: 8px; background: #161d26; color: #fff; font-size: 14px; font-weight: 400; line-height: 1.4; text-transform: none; }
+.sbb-tip-close { position: absolute; top: 8px; right: 10px; border: none; background: none; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }

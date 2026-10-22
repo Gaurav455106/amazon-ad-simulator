@@ -1,3 +1,4 @@
+import { SEARCH_TERM_EXPANSIONS } from '../data/demoAccount';
 export const simulateAuction = (keyword, competitors) => {
   const qualityScore = parseFloat((6 + Math.random() * 4).toFixed(1));
   const myScore = keyword.bid * (qualityScore / 10);
@@ -17,11 +18,7 @@ export const simulateAuction = (keyword, competitors) => {
 };
 
 export const getSearchTerms = (keywords) => {
-  const expansions = {
-    'wireless headphones': ['wireless headphones for gym', 'wireless headphones noise cancelling', 'wireless over ear headphones', 'best wireless headphones 2024'],
-    'bluetooth headphones': ['bluetooth headphones with mic', 'bluetooth headphones for tv', 'bluetooth over ear headphones'],
-    'noise cancelling': ['noise cancelling headphones office', 'noise cancelling earbuds', 'active noise cancelling'],
-  };
+  const expansions = SEARCH_TERM_EXPANSIONS;
   const terms = [];
   keywords.forEach(kw => {
     const base = kw.keyword.toLowerCase();

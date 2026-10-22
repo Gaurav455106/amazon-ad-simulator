@@ -90,7 +90,7 @@ export default function SdProductsCard({ catalogue, products, onChange, isVideo 
               <div className="sd-prod-list">
                 {ordered.map(p => (
                   <div key={p.asin} className="sd-prod-row">
-                    <ProductImage imageType={p.imageType} size={56} />
+                    <ProductImage product={p} size={56} />
                     <div className="sd-prod-info"><a href="#product" className="sd-prod-title" onClick={e => e.preventDefault()}>{p.name}</a><ProductMeta p={p} /></div>
                     <button type="button" className="sd-add-pill" disabled={isAdded(p.asin)} onClick={() => add([p])}>{isAdded(p.asin) ? 'Added' : 'Add'}</button>
                   </div>
@@ -128,7 +128,7 @@ export default function SdProductsCard({ catalogue, products, onChange, isVideo 
           {products.length === 0 && <p className="sd-right-empty">Add products</p>}
           {products.map(p => (
             <div key={p.asin} className="sd-added-prod">
-              <ProductImage imageType={p.imageType} size={48} />
+              <ProductImage product={p} size={48} />
               <div className="sd-prod-info"><span className="sd-prod-title sd-clamp">{p.name}</span><ProductMeta p={p} /></div>
               <button type="button" className="sd-x" aria-label={`Remove ${p.asin}`} onClick={() => onChange(products.filter(x => x.asin !== p.asin))}><X size={15} /></button>
             </div>

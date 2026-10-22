@@ -7,7 +7,7 @@ const baseDraft = (over = {}) => ({
   name: 'Campaign - test', adGroupName: 'Ad group - test', budget: '1000.00',
   startDate: '2026-10-21', endDate: '', portfolioId: '',
   goal: 'consideration', costControl: true, costControlValue: '5.00',
-  adFormat: 'image', products: [{ asin: 'B0CF244HDV', price: 2499 }],
+  adFormat: 'image', products: [{ asin: 'B0BSXC1Z63', price: 299 }],
   targets: defaultTargets(), optimisedTargeting: true,
   creative: { logo: true, headlineOn: false, headline: '', imageOn: false, video: '' },
   ...over,
@@ -104,8 +104,8 @@ describe('buildSdLaunch', () => {
   test('stores the creative and the ad group products', () => {
     const d = baseDraft({ creative: { logo: true, headlineOn: true, headline: 'Crunchy & fresh', imageOn: false, video: '' } });
     const out = buildSdLaunch(d, ids);
-    expect(out.campaign.sdCreative).toMatchObject({ adFormat: 'image', headline: 'Crunchy & fresh', products: ['B0CF244HDV'] });
-    expect(out.adGroup).toMatchObject({ id: 'agD', campaignId: 'cD', products: ['B0CF244HDV'] });
+    expect(out.campaign.sdCreative).toMatchObject({ adFormat: 'image', headline: 'Crunchy & fresh', products: ['B0BSXC1Z63'] });
+    expect(out.adGroup).toMatchObject({ id: 'agD', campaignId: 'cD', products: ['B0BSXC1Z63'] });
   });
 });
 
@@ -127,10 +127,10 @@ describe('sdForecast', () => {
 
 describe('sdTaxonomy', () => {
   test('suggested bids are stable per key', () => {
-    expect(pseudoSugg('im-headphones')).toEqual(pseudoSugg('im-headphones'));
+    expect(pseudoSugg('im-snacks')).toEqual(pseudoSugg('im-snacks'));
   });
   test('flattens nested categories with their path', () => {
     const flat = flattenTree(PRODUCT_CATEGORY_TREE);
-    expect(flat.find(n => n.id === 'pc-tws').path).toEqual(['Electronics', 'Headphones, Earbuds & Accessories']);
+    expect(flat.find(n => n.id === 'pc-makhana').path).toEqual(['Grocery & Gourmet Foods', 'Snack Foods']);
   });
 });

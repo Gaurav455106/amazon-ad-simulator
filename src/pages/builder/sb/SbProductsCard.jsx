@@ -114,7 +114,7 @@ export default function SbProductsCard({ catalogue, products, onChange, brand })
                 {shown.length === 0 && <p className="ng-hint">No products found.</p>}
                 {shown.map(p => (
                   <div key={p.asin} className="sbp-row">
-                    <ProductImage imageType={p.imageType} size={60} />
+                    <ProductImage product={p} size={60} />
                     <div className="sbp-info"><span className="sbp-title">{p.name}</span><ProductMeta product={p} /></div>
                     <button type="button" className="sbp-add" disabled={isAdded(p.asin) || isFull} onClick={() => add([p])}>
                       {isAdded(p.asin) ? 'Added' : 'Add'}
@@ -167,7 +167,7 @@ export default function SbProductsCard({ catalogue, products, onChange, brand })
                 onDragStart={e => e.dataTransfer.setData('text/plain', String(i))}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => move(Number(e.dataTransfer.getData('text/plain')), i)}>⋮⋮</span>
-              <ProductImage imageType={p.imageType} size={56} />
+              <ProductImage product={p} size={56} />
               <div className="sbp-info"><span className="sbp-title sbp-title-2">{p.name}</span><ProductMeta product={p} /></div>
               <button type="button" className="ng-x" aria-label={`Remove ${p.asin}`} onClick={() => remove(p.asin)}><X size={14} /></button>
             </div>

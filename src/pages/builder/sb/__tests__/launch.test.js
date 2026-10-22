@@ -7,8 +7,8 @@ const baseDraft = (over = {}) => ({
   name: 'Campaign - test', adGroupName: 'Ad group - test', budget: '500', budgetType: 'Daily',
   startDate: '2026-10-21', endDate: '', portfolioId: '', goal: 'page-visits', site: 'amazon',
   adFormat: 'product-collection', collectionType: 'automatic', products: [],
-  titleMode: 'auto', customTitle: '', brandName: 'SoundMax', landingPage: 'new-landing-page',
-  targetType: 'keyword', keywords: [{ keyword: 'wireless headphones', matchType: 'Broad', bid: '4.00' }],
+  titleMode: 'auto', customTitle: '', brandName: 'Farmley', landingPage: 'new-landing-page',
+  targetType: 'keyword', keywords: [{ keyword: 'roasted makhana', matchType: 'Broad', bid: '4.00' }],
   productTargets: [], negativeKeywords: [], ...over,
 });
 const ids = { campaignId: 'cB', adGroupId: 'agB', today: '2026-10-21' };
@@ -56,7 +56,7 @@ describe('buildSbLaunch', () => {
     const out = buildSbLaunch(baseDraft({ site: 'amazon-business' }), ids);
     expect(out.campaign).toMatchObject({ id: 'cB', type: 'Sponsored Brands', budget: 500, site: 'amazon-business', costType: 'CPC' });
     expect(out.adGroup).toMatchObject({ id: 'agB', campaignId: 'cB' });
-    expect(out.keywords[0]).toMatchObject({ keyword: 'wireless headphones', matchType: 'Broad', bid: 4, adGroupId: 'agB' });
+    expect(out.keywords[0]).toMatchObject({ keyword: 'roasted makhana', matchType: 'Broad', bid: 4, adGroupId: 'agB' });
   });
 
   test('stores manual collection products on the creative and ad group', () => {
@@ -79,10 +79,10 @@ describe('buildSbLaunch', () => {
 });
 
 describe('parseAsinList', () => {
-  const catalogue = [product('B0CF244HDV'), product('B0CF24MSGB')];
+  const catalogue = [product('B0BSXC1Z63'), product('B09J578NDM')];
   test('finds catalogue ASINs separated by commas, spaces or new lines', () => {
-    const { found, invalid } = parseAsinList('b0cf244hdv, B0CF24MSGB\nB0CF244HDV', catalogue);
-    expect(found.map(p => p.asin)).toEqual(['B0CF244HDV', 'B0CF24MSGB']);
+    const { found, invalid } = parseAsinList('b0bsxc1z63, B09J578NDM\nB0BSXC1Z63', catalogue);
+    expect(found.map(p => p.asin)).toEqual(['B0BSXC1Z63', 'B09J578NDM']);
     expect(invalid).toEqual([]);
   });
 

@@ -3,7 +3,9 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-
 import { useStore } from '../store/useStore';
 import { SUGGESTED_KWS } from '../data/keywordSuggestions';
 import ProductImage from '../components/console/ProductImage';
-import { PRODUCT_IMAGES } from '../data/productImages';
+import { productVisual } from '../data/productImages';
+import SuggestedBidBasis from './builder/sp/SuggestedBidBasis';
+import { BRAND_NAME, DEMO_PRODUCTS, SUGGESTED_CATS, ALL_CATEGORIES, COMPETITORS } from '../data/demoAccount';
 import { localISODate, consoleTimestamp } from '../utils/dateRanges';
 import { spForecast } from '../utils/spForecast';
 import { CampaignSetupCard, SitesCard, PresetSettingsCard } from './builder/sp/SetupCards';
@@ -123,10 +125,14 @@ function TipIcon({ tip }) {
 function Toggle({ on, onChange }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={on}
       className={`ccs-toggle ${on ? 'on' : 'off'}`}
       onClick={() => onChange(!on)}
       title={on ? 'Enabled' : 'Disabled'}
     >
+      {on && <svg className="ccs-toggle-check" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2 5 8.6l4.5-5" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
       <span className="ccs-toggle-knob" />
     </button>
   );
@@ -229,7 +235,7 @@ export default function CreateCampaignSetup() {
     rating: 4.0,
     reviews: 0,
     status: 'In stock',
-    imageType: 'over-ear-black',
+    imageType: 'snack-pouch',
   });
 
   const addProduct = (p) => {
@@ -559,9 +565,9 @@ export default function CreateCampaignSetup() {
   const [sbLifetimeTooltip, setSbLifetimeTooltip] = useState(false);
   const [sbBudgetDropOpen, setSbBudgetDropOpen] = useState(false);
   const [sbAdName, setSbAdName] = useState('');
-  const [sbBrandName, setSbBrandName] = useState('SoundMax');
+  const [sbBrandName, setSbBrandName] = useState(BRAND_NAME);
   const [sbLogoDropOpen, setSbLogoDropOpen] = useState(false);
-  const [sbLogoUrl, setSbLogoUrl] = useState({ type: 'asset', bg: '#6c2eb9', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: '#febd69' }] });
+  const [sbLogoUrl, setSbLogoUrl] = useState({ type: 'asset', bg: '#4f7a28', lines: [{ t: 'FARM', c: 'white' }, { t: 'LEY', c: '#febd69' }] });
   const [sbCreativeAssetsOpen, setSbCreativeAssetsOpen] = useState(false);
   const [sbAdTitle, setSbAdTitle] = useState('auto');
   const [sbStandardTitle, setSbStandardTitle] = useState('Browse the collection');
@@ -587,7 +593,7 @@ export default function CreateCampaignSetup() {
   const [sbCostControlEnabled, setSbCostControlEnabled] = useState(true);
   const [sbTargetCPC, setSbTargetCPC] = useState('10');
   // Reserve share of voice
-  const [sovBrand, setSovBrand] = useState('SoundMax');
+  const [sovBrand, setSovBrand] = useState(BRAND_NAME);
   const [sovKwTab, setSovKwTab] = useState('suggested');
   const [sovAddedKws, setSovAddedKws] = useState([]);
   const [sovKwInput, setSovKwInput] = useState('');
@@ -604,9 +610,9 @@ export default function CreateCampaignSetup() {
   const [sbSSPreviewPage, setSbSSPreviewPage] = useState(1);
   const [sbSSPreviewFormat, setSbSSPreviewFormat] = useState('mobile-top');
   const [sbSSStorePages, setSbSSStorePages] = useState([
-    { pageId: 'earbuds', displayName: 'Earbuds', imageType: null },
-    { pageId: 'headphones', displayName: 'Headphones', imageType: null },
-    { pageId: 'gaming', displayName: 'Gaming', imageType: null },
+    { pageId: 'makhana', displayName: 'Makhana', imageType: null },
+    { pageId: 'seeds', displayName: 'Seeds', imageType: null },
+    { pageId: 'dry-fruits', displayName: 'Dry Fruits', imageType: null },
   ]);
   const [sbSSImgPickerIdx, setSbSSImgPickerIdx] = useState(null);
   const [sbSSImgPickerQuery, setSbSSImgPickerQuery] = useState('');
@@ -713,59 +719,7 @@ export default function CreateCampaignSetup() {
 
 
   // ── Product targeting data ──
-  const SUGGESTED_CATS = [
-    { id: 'over-ear', path: '/Electronics/Headphones, Earbuds & Accessories/Over-Ear Headphones', name: 'Over-Ear Headphones', sugg: null, prodMin: 284, prodMax: 412, brands: ['Sony','JBL','boAt','Sennheiser','Bose','SoundMax','Skullcandy','Jabra'] },
-    { id: 'tws', path: '/Electronics/Headphones, Earbuds & Accessories/True Wireless Earbuds', name: 'True Wireless Earbuds', sugg: null, prodMin: 389, prodMax: 521, brands: ['Sony','JBL','boAt','Apple','Samsung','Noise','SoundMax','Skullcandy'] },
-    { id: 'gaming-hs', path: '/Electronics/Headphones, Earbuds & Accessories/Gaming Headsets', name: 'Gaming Headsets', sugg: 6.87, suggMin: 5.23, suggMax: 8.44, prodMin: 198, prodMax: 325, brands: ['SoundMax','HyperX','Logitech','Corsair','Razer','boAt'] },
-  ];
-
-  const INDIV_SUGGESTED = [
-    { id: 'sony-xm5', name: 'Sony WH-1000XM5 Industry Leading Noise Cancelling Wireless Headphones with Auto Noise Cancelling', format: 'Electronics', stars: 4.7, reviews: 12847, price: 24990, originalPrice: 29990, status: 'In stock', asin: 'B09XS7JWHH', sugg: 9.82, suggMin: 7.64, suggMax: 12.26, suggExpanded: 6.54, imgColor: '#111', imgAccent: '#d4002a' },
-    { id: 'jbl-660nc', name: 'JBL Live 660NC – Wireless Over-Ear Noise Cancelling Headphones with Long Battery Life and Voice Assistant', format: 'Electronics', stars: 4.4, reviews: 7234, price: 8999, originalPrice: 14999, status: 'In stock', asin: 'B09B8FW7Y9', sugg: 7.43, suggMin: 5.81, suggMax: 9.32, suggExpanded: 4.97, imgColor: '#e05500', imgAccent: '#fff' },
-    { id: 'boat-550', name: 'boAt Rockerz 550 Bluetooth On Ear Headphones with Mic, Upto 20 Hours Playback, 50MM Drivers, Padded Ear Cushions', format: 'Electronics', stars: 4.2, reviews: 45231, price: 1299, originalPrice: 3990, status: 'In stock', asin: 'B08QCY3MWF', sugg: null, suggExpanded: null, asinImg: null, imgColor: '#0057b8', imgAccent: '#00c9a7' },
-    { id: 'senn-hd450', name: 'Sennheiser HD 450BT Bluetooth 5.0 Wireless Headphone with Active Noise Cancellation, 30-Hour Battery Life', format: 'Electronics', stars: 4.3, reviews: 3812, price: 7990, originalPrice: 11990, status: 'In stock', asin: 'B085RGRPMN', sugg: 8.14, suggMin: 6.23, suggMax: 10.05, suggExpanded: 5.43, imgColor: '#1a1a1a', imgAccent: '#c8c8c8' },
-    { id: 'bose-qc45', name: 'Bose QuietComfort 45 Bluetooth Wireless Noise Cancelling Headphones – Triple Black', format: 'Electronics', stars: 4.6, reviews: 9102, price: 22900, originalPrice: 26900, status: 'In stock', asin: 'B098FKXT8L', sugg: 10.54, suggMin: 8.32, suggMax: 13.21, suggExpanded: 7.12, imgColor: '#2c2c2c', imgAccent: '#b8963e' },
-    { id: 'skull-evo', name: 'Skullcandy Crusher Evo Wireless Over-Ear Headphone with Sensory Bass, 40 Hr Battery, Microphone', format: 'Electronics', stars: 4.1, reviews: 2341, price: 9999, originalPrice: 14999, status: 'In stock', asin: 'B08N3L8YHR', sugg: 6.32, suggMin: 4.87, suggMax: 7.96, suggExpanded: 4.18, imgColor: '#6600cc', imgAccent: '#ff0080' },
-    { id: 'jabra-ev85', name: 'Jabra Evolve2 85 Wireless PC Headset – Noise Cancelling Microphone, Stereo Headphones', format: 'Electronics', stars: 4.5, reviews: 1876, price: 39990, originalPrice: 45000, status: 'In stock', asin: 'B09V2XGXR2', sugg: 12.74, suggMin: 9.84, suggMax: 15.93, suggExpanded: 8.62, imgColor: '#003865', imgAccent: '#4db6e4' },
-    { id: 'anker-q35', name: 'Soundcore by Anker Life Q35 Multi Mode Active Noise Cancelling Headphones, Bluetooth 5.0, Hi-Res Audio', format: 'Electronics', stars: 4.4, reviews: 6123, price: 5999, originalPrice: 8999, status: 'In stock', asin: 'B08HMWZBXN', sugg: 5.87, suggMin: 4.42, suggMax: 7.34, suggExpanded: 3.94, imgColor: '#00897b', imgAccent: '#fff' },
-  ];
-
-  const ALL_CATEGORIES = [
-    { id: 'electronics', name: 'Electronics', sugg: null, children: [
-      { id: 'headphones-all', name: 'Headphones, Earbuds & Accessories', sugg: 8.42, suggMin: 6.52, suggMax: 10.74, prodMin: 1284, prodMax: 1892, brands: ['Sony','JBL','boAt','Sennheiser','Bose','Samsung','SoundMax','Skullcandy','Jabra','Anker','Noise','OnePlus'], children: [
-        { id: 'over-ear-s', name: 'Over-Ear Headphones', sugg: 9.15, suggMin: 7.24, suggMax: 11.44, prodMin: 284, prodMax: 412, brands: ['Sony','JBL','boAt','Sennheiser','Bose','SoundMax','Skullcandy'] },
-        { id: 'in-ear-s', name: 'In-Ear Headphones', sugg: 7.23, suggMin: 5.89, suggMax: 8.91, prodMin: 412, prodMax: 634, brands: ['Sony','JBL','boAt','SoundMax','Skullcandy','Noise','Anker'] },
-        { id: 'tws-s', name: 'True Wireless Earbuds', sugg: 9.18, suggMin: 7.24, suggMax: 11.52, prodMin: 389, prodMax: 521, brands: ['Sony','JBL','boAt','Apple','Samsung','Noise','SoundMax'] },
-        { id: 'gaming-hs-s', name: 'Gaming Headsets', sugg: 6.87, suggMin: 5.23, suggMax: 8.44, prodMin: 198, prodMax: 325, brands: ['SoundMax','HyperX','Logitech','Corsair','Razer','boAt'] },
-        { id: 'neckband-s', name: 'Neckband Earphones', sugg: 5.44, suggMin: 4.12, suggMax: 6.80, prodMin: 156, prodMax: 289, brands: ['boAt','Noise','Sony','SoundMax','Sennheiser','OnePlus'] },
-      ]},
-      { id: 'audio-home', name: 'Audio & Home Theatre', sugg: null, children: [
-        { id: 'bt-speakers', name: 'Bluetooth Speakers', sugg: 7.82, suggMin: 5.91, suggMax: 9.78, prodMin: 892, prodMax: 1234, brands: ['Sony','JBL','boAt','Bose','Marshall','Anker'] },
-        { id: 'smart-speakers', name: 'Smart Speakers', sugg: 6.23, suggMin: 4.87, suggMax: 7.79, prodMin: 234, prodMax: 389, brands: ['Amazon','Google','Apple','Sony'] },
-      ]},
-      { id: 'wearable', name: 'Wearable Technology', sugg: null, children: [
-        { id: 'smartwatches', name: 'Smart Watches', sugg: 5.47, suggMin: 4.20, suggMax: 6.84, prodMin: 384, prodMax: 612, brands: ['Samsung','Apple','Noise','boAt','Amazfit','Garmin'] },
-        { id: 'fitness', name: 'Fitness Trackers', sugg: 4.18, suggMin: 3.12, suggMax: 5.23, prodMin: 198, prodMax: 342, brands: ['Fitbit','Noise','boAt','Samsung','Mi','Amazfit'] },
-      ]},
-    ]},
-    { id: 'computers', name: 'Computers & Accessories', sugg: null, children: [
-      { id: 'gaming-acc', name: 'Gaming Accessories', sugg: null, children: [
-        { id: 'pc-gaming-hs', name: 'PC Gaming Headsets', sugg: 6.12, suggMin: 4.78, suggMax: 7.65, prodMin: 87, prodMax: 143, brands: ['HyperX','Logitech','Corsair','Razer','SoundMax'] },
-      ]},
-      { id: 'audio-video-acc', name: 'Audio & Video Accessories', sugg: null, children: [] },
-    ]},
-    { id: 'music', name: 'Musical Instruments', sugg: null, children: [
-      { id: 'studio-hp', name: 'Studio Headphones', sugg: 12.34, suggMin: 9.87, suggMax: 15.43, prodMin: 45, prodMax: 89, brands: ['Sennheiser','Sony','Audio-Technica','SoundMax','AKG'] },
-    ]},
-    { id: 'sports', name: 'Sports, Fitness & Outdoors', sugg: null, children: [
-      { id: 'sports-hp', name: 'Sports & Fitness Headphones', sugg: 6.45, suggMin: 4.89, suggMax: 8.01, prodMin: 212, prodMax: 378, brands: ['Sony','JBL','boAt','SoundMax','Jabra','Plantronics'] },
-    ]},
-    { id: 'video-games', name: 'Video Games', sugg: null, children: [
-      { id: 'vg-accessories', name: 'Gaming Accessories', sugg: null, children: [
-        { id: 'vg-headsets', name: 'Console Gaming Headsets', sugg: 7.23, suggMin: 5.64, suggMax: 9.04, prodMin: 112, prodMax: 189, brands: ['SoundMax','Sony','Microsoft','Turtle Beach','HyperX'] },
-      ]},
-    ]},
-  ];
+  const INDIV_SUGGESTED = COMPETITORS.map(c => ({ ...c, format: 'Grocery', stars: c.rating, originalPrice: null, status: 'In stock' }));
 
   const addProdTarget = (cat) => {
     if (!addedProdTargets.find(t => t.id === cat.id)) {
@@ -795,18 +749,15 @@ export default function CreateCampaignSetup() {
 
   const getIndivImage = (p) => {
     const c = p.imgColor || '#333';
-    const a = p.imgAccent || '#ccc';
+    const a = p.imgAccent || '#fff8e7';
     return (
       <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
         <rect width="56" height="56" rx="4" fill={c} />
-        {/* Headphone arc */}
-        <path d={`M14 28 Q14 14 28 14 Q42 14 42 28`} fill="none" stroke={a} strokeWidth="4" strokeLinecap="round" />
-        {/* Left ear cup */}
-        <rect x="10" y="26" width="8" height="12" rx="4" fill={a} />
-        {/* Right ear cup */}
-        <rect x="38" y="26" width="8" height="12" rx="4" fill={a} />
+        {/* Snack pouch */}
+        <path d="M18 12 H38 L41 19 V44 Q41 46 39 46 H17 Q15 46 15 44 V19 Z" fill={a} opacity="0.9" />
+        <rect x="20" y="24" width="16" height="10" rx="2" fill={c} opacity="0.6" />
         {/* Brand initial */}
-        <text x="28" y="50" textAnchor="middle" fontSize="8" fill={a} opacity="0.7" fontFamily="Arial">{p.id.split('-')[0].slice(0,3).toUpperCase()}</text>
+        <text x="28" y="50" textAnchor="middle" fontSize="8" fill={a} opacity="0.7" fontFamily="Arial">{(p.brand || p.id).slice(0, 3).toUpperCase()}</text>
       </svg>
     );
   };
@@ -1152,16 +1103,16 @@ export default function CreateCampaignSetup() {
                 </div>
                 <div className="ccs-field" style={{ marginTop: 14 }}>
                   <label className="ccs-label">Brand <InfoIcon /></label>
-                  <div style={{ fontSize: 13, color: '#333', marginTop: 4 }}>SoundMax</div>
+                  <div style={{ fontSize: 13, color: '#333', marginTop: 4 }}>{BRAND_NAME}</div>
                 </div>
               </div>
             ) : (() => {
-              const SOV_KWS = ['soundmax headphones'];
+              const SOV_KWS = [`${BRAND_NAME.toLowerCase()} makhana`];
               const handleSovAddKw = (addSovAddedKws) => {
                 const lines = sovKwInput.split('\n').map(l => l.trim()).filter(Boolean);
                 const passed = [], failed = [];
                 lines.forEach(kw => {
-                  if (kw.toLowerCase().includes('soundmax')) passed.push(kw);
+                  if (kw.toLowerCase().includes(BRAND_NAME.toLowerCase())) passed.push(kw);
                   else failed.push({ kw, reason: 'Not trademarked' });
                 });
                 if (passed.length) addSovAddedKws(prev => [...prev, ...passed.filter(k => !prev.some(a => a.kw === k)).map(k => ({ kw: k, matchType: 'Exact' }))]);
@@ -1203,7 +1154,7 @@ export default function CreateCampaignSetup() {
                   <div className="ccs-select-wrap" style={{ width: 160 }}>
                     <select className="ccs-input-full" value={sovBrand} onChange={e => setSovBrand(e.target.value)}>
                       <option value="all">All</option>
-                      <option value="SoundMax">SoundMax</option>
+                      <option value={BRAND_NAME}>{BRAND_NAME}</option>
                     </select>
                     <ChevronDown size={14} className="ccs-select-chevron" />
                   </div>
@@ -1388,7 +1339,7 @@ export default function CreateCampaignSetup() {
                     <div className="ccs-select-wrap" style={{ width: 220 }}>
                       <select className="ccs-input-full" value={sbSSStore} onChange={e => { setSbSSStore(e.target.value); setSbSSSection(null); }}>
                         <option value="">-- Select a store --</option>
-                        <option value="SoundMax">SoundMax</option>
+                        <option value={BRAND_NAME}>{BRAND_NAME}</option>
                       </select>
                       <ChevronDown size={14} className="ccs-select-chevron" />
                     </div>
@@ -1423,7 +1374,7 @@ export default function CreateCampaignSetup() {
                               <div>
                                 <label className="ccs-label" style={{ marginBottom: 6 }}>Choose a Store</label>
                                 <div className="ccs-select-wrap" style={{ width: 180 }}>
-                                  <select className="ccs-input-full"><option>SoundMax</option></select>
+                                  <select className="ccs-input-full"><option>{BRAND_NAME}</option></select>
                                   <ChevronDown size={14} className="ccs-select-chevron" />
                                 </div>
                               </div>
@@ -1432,9 +1383,9 @@ export default function CreateCampaignSetup() {
                                 <div className="ccs-select-wrap" style={{ width: 160 }}>
                                   <select className="ccs-input-full">
                                     <option>Home</option>
-                                    <option>Headphones</option>
-                                    <option>Earbuds</option>
-                                    <option>Gaming</option>
+                                    <option>Makhana</option>
+                                    <option>Seeds</option>
+                                    <option>Dry Fruits</option>
                                   </select>
                                   <ChevronDown size={14} className="ccs-select-chevron" />
                                 </div>
@@ -1496,7 +1447,7 @@ export default function CreateCampaignSetup() {
                         return (
                           <div key={p.asin} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid #f5f5f5', opacity: isDisabled ? 0.45 : 1 }}>
                             <div style={{ width: 48, height: 48, flexShrink: 0, border: '1px solid #e8e8e8', borderRadius: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
-                              {PRODUCT_IMAGES[p.imageType] || PRODUCT_IMAGES['over-ear-black']}
+                              {productVisual(p)}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: '#0073bb', fontWeight: 500, lineHeight: 1.4, marginBottom: 3, cursor: 'pointer' }}
@@ -1538,7 +1489,7 @@ export default function CreateCampaignSetup() {
                         <>
                           <div style={{ display: 'flex', gap: 10, padding: '10px', border: '1px solid #e8e8e8', borderRadius: 4, marginBottom: 10, position: 'relative' }}>
                             <div style={{ width: 48, height: 48, flexShrink: 0, border: '1px solid #e8e8e8', borderRadius: 3, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
-                              {PRODUCT_IMAGES[sbVidPDPProduct.imageType] || PRODUCT_IMAGES['over-ear-black']}
+                              {productVisual(sbVidPDPProduct)}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 12, color: '#0073bb', lineHeight: 1.4 }}>{sbVidPDPProduct.name.length > 60 ? sbVidPDPProduct.name.slice(0,60) + '…' : sbVidPDPProduct.name}</div>
@@ -1580,12 +1531,12 @@ export default function CreateCampaignSetup() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                   {[
-                    { bg: '#6c2eb9', label: 'SoundMax Logo', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: '#febd69' }] },
-                    { bg: '#1a3a6b', label: 'Brand Blue', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: '#febd69' }] },
-                    { bg: '#c8102e', label: 'Brand Red', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: 'white' }] },
-                    { bg: '#2d6a4f', label: 'Brand Green', lines: [{ t: 'SM', c: 'white' }] },
-                    { bg: '#e76f00', label: 'Brand Orange', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: '#222' }] },
-                    { bg: '#111', label: 'Brand Dark', lines: [{ t: 'SOUND', c: '#febd69' }, { t: 'MAX', c: 'white' }] },
+                    { bg: '#4f7a28', label: `${BRAND_NAME} Logo`, lines: [{ t: 'FARM', c: 'white' }, { t: 'LEY', c: '#febd69' }] },
+                    { bg: '#1a3a6b', label: 'Brand Blue', lines: [{ t: 'FARM', c: 'white' }, { t: 'LEY', c: '#febd69' }] },
+                    { bg: '#c8102e', label: 'Brand Red', lines: [{ t: 'FARM', c: 'white' }, { t: 'LEY', c: 'white' }] },
+                    { bg: '#2d6a4f', label: 'Brand Green', lines: [{ t: 'FM', c: 'white' }] },
+                    { bg: '#e76f00', label: 'Brand Orange', lines: [{ t: 'FARM', c: 'white' }, { t: 'LEY', c: '#222' }] },
+                    { bg: '#111', label: 'Brand Dark', lines: [{ t: 'FARM', c: '#febd69' }, { t: 'LEY', c: 'white' }] },
                   ].map((asset, idx) => (
                     <div key={idx} onClick={() => { setSbLogoUrl({ type: 'asset', bg: asset.bg, lines: asset.lines }); setSbCreativeAssetsOpen(false); }}
                       style={{ cursor: 'pointer', border: sbLogoUrl?.bg === asset.bg ? '2px solid #0073bb' : '2px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
@@ -1777,7 +1728,7 @@ export default function CreateCampaignSetup() {
                           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Choose a Brand Store</div>
                           <div className="ccs-select-wrap" style={{ width: 260 }}>
                             <select className="ccs-input-full" style={{ fontSize: 13 }}>
-                              <option>SoundMax</option>
+                              <option>{BRAND_NAME}</option>
                             </select>
                             <ChevronDown size={13} className="ccs-select-chevron" />
                           </div>
@@ -1788,9 +1739,9 @@ export default function CreateCampaignSetup() {
                             <div className="ccs-select-wrap" style={{ width: 260 }}>
                               <select className="ccs-input-full" style={{ fontSize: 13 }}>
                                 <option>Home</option>
-                                <option>Headphones</option>
-                                <option>Earbuds</option>
-                                <option>Gaming</option>
+                                <option>Makhana</option>
+                                <option>Seeds</option>
+                                <option>Dry Fruits</option>
                               </select>
                               <ChevronDown size={13} className="ccs-select-chevron" />
                             </div>
@@ -1985,7 +1936,7 @@ export default function CreateCampaignSetup() {
                         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: '#333' }}>Store pages</div>
                         <div style={{ fontSize: 12, color: '#666', marginBottom: 14 }}>Configure the 3 store pages shown in your ad.</div>
                         {sbSSStorePages.map((pg, idx) => {
-                          const PAGE_META = { earbuds: 'Earbuds', headphones: 'Headphones', gaming: 'Gaming', home: 'Home' };
+                          const PAGE_META = { makhana: 'Makhana', seeds: 'Seeds', 'dry-fruits': 'Dry Fruits', home: 'Home' };
                           const isPickerOpen = sbSSImgPickerIdx === idx;
                           const filteredProducts = allProducts.filter(p =>
                             !sbSSImgPickerQuery || p.name.toLowerCase().includes(sbSSImgPickerQuery.toLowerCase()) || p.asin.toLowerCase().includes(sbSSImgPickerQuery.toLowerCase())
@@ -2030,13 +1981,13 @@ export default function CreateCampaignSetup() {
                                     )}
                                     {filteredProducts.map((p, pi) => (
                                       <div key={p.asin} onClick={() => {
-                                        const np = sbSSStorePages.map((sp, i) => i === idx ? { ...sp, imageType: p.imageType } : sp);
+                                        const np = sbSSStorePages.map((sp, i) => i === idx ? { ...sp, imageType: p.imageType, imageUrl: p.imageUrl } : sp);
                                         setSbSSStorePages(np);
                                         setSbSSImgPickerIdx(null);
                                         setSbSSImgPickerQuery('');
                                       }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: pi < filteredProducts.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer' }}>
                                         <div style={{ width: 52, height: 52, flexShrink: 0, border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden', background: '#f8f8f8' }}>
-                                          {PRODUCT_IMAGES[p.imageType] || PRODUCT_IMAGES['over-ear-black']}
+                                          {productVisual(p)}
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                           <div style={{ fontSize: 12, color: '#111', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name}</div>
@@ -2053,7 +2004,7 @@ export default function CreateCampaignSetup() {
                                   <div style={{ padding: '10px 12px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                                     <div style={{ width: 52, height: 52, background: '#f0f0f0', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', border: '1px solid #eee' }}>
                                       {pg.imageType
-                                        ? (PRODUCT_IMAGES[pg.imageType] || <div style={{ width: 24, height: 24, background: '#ddd', borderRadius: 2 }} />)
+                                        ? (pg.imageType ? productVisual(pg) : <div style={{ width: 24, height: 24, background: '#ddd', borderRadius: 2 }} />)
                                         : <div style={{ width: 24, height: 24, background: '#ddd', borderRadius: 2 }} />
                                       }
                                     </div>
@@ -2093,7 +2044,7 @@ export default function CreateCampaignSetup() {
                               <div style={{ width: 36, height: 28, background: sbLogoUrl?.bg || '#f0f0f0', borderRadius: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                                 {sbLogoUrl?.type === 'upload'
                                   ? <img src={sbLogoUrl.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  : (sbLogoUrl?.lines || [{ t: 'SM', c: 'white' }]).map((l, i) => <span key={i} style={{ color: l.c, fontWeight: 800, fontSize: 7, letterSpacing: 1 }}>{l.t}</span>)
+                                  : (sbLogoUrl?.lines || [{ t: 'FM', c: 'white' }]).map((l, i) => <span key={i} style={{ color: l.c, fontWeight: 800, fontSize: 7, letterSpacing: 1 }}>{l.t}</span>)
                                 }
                               </div>
                             ),
@@ -2160,7 +2111,7 @@ export default function CreateCampaignSetup() {
                       <div key={i} style={{ background: '#f8f8f8', borderRadius: 3, overflow: 'hidden', border: '1px solid #eee' }}>
                         <div style={{ height: h, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                           {pg.imageType
-                            ? <div style={{ width: h, height: h }}>{PRODUCT_IMAGES[pg.imageType]}</div>
+                            ? <div style={{ width: h, height: h }}>{productVisual(pg)}</div>
                             : <div style={{ width: h * 0.4, height: h * 0.4, background: '#ddd', borderRadius: 3 }} />
                           }
                         </div>
@@ -2614,7 +2565,7 @@ export default function CreateCampaignSetup() {
                                         setSbVidProductPicker(null); setSbVidProductPickerQuery(''); setSbVidProductPickerPage(1);
                                       }} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #eee', cursor: 'pointer' }}>
                                         <input type="radio" readOnly checked={sbVidProductPicker !== 'add' && sbVidProducts[sbVidProductPicker]?.asin === p.asin} style={{ marginTop: 4, flexShrink: 0 }} />
-                                        <div style={{ width: 52, height: 52, flexShrink: 0, border: '1px solid #eee', borderRadius: 3, overflow: 'hidden' }}>{PRODUCT_IMAGES[p.imageType]}</div>
+                                        <div style={{ width: 52, height: 52, flexShrink: 0, border: '1px solid #eee', borderRadius: 3, overflow: 'hidden' }}>{productVisual(p)}</div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                           <div style={{ fontSize: 13, color: '#0073bb', lineHeight: 1.4, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.name}</div>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', fontSize: 12, color: '#555' }}>
@@ -2670,10 +2621,10 @@ export default function CreateCampaignSetup() {
                               {sbVidProducts.map((p, idx) => (
                                 <div key={p.asin} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, border: '1px solid #ddd', borderRadius: 4, padding: '12px 12px', marginBottom: 8, background: 'white' }}>
                                   <div style={{ color: '#aaa', fontSize: 16, cursor: 'grab', flexShrink: 0, paddingTop: 2 }}>⠿</div>
-                                  <div style={{ width: 54, height: 54, flexShrink: 0, border: '1px solid #eee', borderRadius: 3, overflow: 'hidden' }}>{PRODUCT_IMAGES[p.imageType]}</div>
+                                  <div style={{ width: 54, height: 54, flexShrink: 0, border: '1px solid #eee', borderRadius: 3, overflow: 'hidden' }}>{productVisual(p)}</div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: '#111', lineHeight: 1.4, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                      {p.brand || 'SoundMax'}<br />{p.name.length > 30 ? p.name.slice(0, 30) + '...' : p.name}
+                                      {p.brand || BRAND_NAME}<br />{p.name.length > 30 ? p.name.slice(0, 30) + '...' : p.name}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                       {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= Math.round(p.rating) ? '#e47911' : '#ccc', fontSize: 13 }}>★</span>)}
@@ -2738,7 +2689,7 @@ export default function CreateCampaignSetup() {
                         </div>
                       </div>
                     );
-                    const defaultProd = { imageType: 'over-ear-black', name: 'SoundMax Pro Wireless Headphones', rating: 4.5, reviews: 2847 };
+                    const defaultProd = DEMO_PRODUCTS[0];
                     const prods = sbLandingPage === 'product-detail'
                       ? (sbVidPDPProduct ? [sbVidPDPProduct] : [defaultProd])
                       : (sbVidProducts.length > 0 ? sbVidProducts : [defaultProd]);
@@ -2753,7 +2704,7 @@ export default function CreateCampaignSetup() {
                           {/* Prev card peek */}
                           {prevP ? (
                             <div style={{ flex: '0 0 50px', overflow: 'hidden', background: '#f8f8f8', border: '1px solid #eee', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <div style={{ width: 38, height: 38, overflow: 'hidden' }}>{PRODUCT_IMAGES[prevP.imageType] || PRODUCT_IMAGES['over-ear-black']}</div>
+                              <div style={{ width: 38, height: 38, overflow: 'hidden' }}>{productVisual(prevP)}</div>
                             </div>
                           ) : (
                             <div style={{ flex: '0 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2762,7 +2713,7 @@ export default function CreateCampaignSetup() {
                           )}
                           {/* Current card */}
                           <div style={{ flex: 1, background: 'white', borderRadius: 3, padding: '6px 8px', border: '1px solid #ddd', display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
-                            <div style={{ width: 48, height: 48, flexShrink: 0, border: '1px solid #f0f0f0', borderRadius: 2, overflow: 'hidden' }}>{PRODUCT_IMAGES[carouselP.imageType] || PRODUCT_IMAGES['over-ear-black']}</div>
+                            <div style={{ width: 48, height: 48, flexShrink: 0, border: '1px solid #f0f0f0', borderRadius: 2, overflow: 'hidden' }}>{productVisual(carouselP)}</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 9.5, color: '#111', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{carouselP.name}</div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 3 }}>
@@ -2774,7 +2725,7 @@ export default function CreateCampaignSetup() {
                           {/* Next card peek */}
                           {nextP && (
                             <div style={{ flex: '0 0 50px', overflow: 'hidden', background: '#f8f8f8', border: '1px solid #eee', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <div style={{ width: 38, height: 38, overflow: 'hidden' }}>{PRODUCT_IMAGES[nextP.imageType] || PRODUCT_IMAGES['over-ear-black']}</div>
+                              <div style={{ width: 38, height: 38, overflow: 'hidden' }}>{productVisual(nextP)}</div>
                             </div>
                           )}
                         </div>
@@ -2891,7 +2842,7 @@ export default function CreateCampaignSetup() {
                                   {prods.slice(0, 3).map((p, i) => (
                                     <div key={i} style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '0 5px' }}>
                                       <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: 2, overflow: 'hidden', border: '1px solid #eee', marginBottom: 4 }}>
-                                        {PRODUCT_IMAGES[p.imageType] || PRODUCT_IMAGES['over-ear-black']}
+                                        {productVisual(p)}
                                       </div>
                                       <div style={{ fontSize: 8.5, color: '#111', lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', width: '100%' }}>{p.name}</div>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: 2 }}>
@@ -3654,9 +3605,9 @@ export default function CreateCampaignSetup() {
                             <button className="link-btn ccs-exclude-all">Exclude all</button>
                           </div>
                           <div className="ccs-brand-row">
-                            <span>SoundMax</span>
+                            <span>{BRAND_NAME}</span>
                             <button className="link-btn ccs-exclude-btn"
-                              onClick={() => !addedNegProds.find(x => x.name==='SoundMax') && setAddedNegProds(p => [...p, { type: 'brand', name: 'SoundMax' }])}>
+                              onClick={() => !addedNegProds.find(x => x.name===BRAND_NAME) && setAddedNegProds(p => [...p, { type: 'brand', name: BRAND_NAME }])}>
                               Exclude
                             </button>
                           </div>
@@ -4026,7 +3977,7 @@ export default function CreateCampaignSetup() {
                         const added = !!addedProducts.find(x => x.asin === p.asin);
                         return (
                           <div key={p.asin} className="ccs-product-row">
-                            <ProductImage imageType={p.imageType} />
+                            <ProductImage product={p} />
                             <div className="ccs-product-details">
                               <div className="ccs-product-name-link">{p.name}</div>
                               <div className="ccs-product-sub">
@@ -4168,7 +4119,7 @@ export default function CreateCampaignSetup() {
                   <div className="ccs-added-list">
                     {addedProducts.map(p => (
                       <div key={p.asin} className="pd-added">
-                        <ProductImage imageType={p.imageType} size={60} />
+                        <ProductImage product={p} size={60} />
                         <div className="pd-info">
                           <span className="pd-title">{p.name}</span>
                           <span className="pd-meta"><Stars rating={p.rating} /><span className="pd-count">({p.reviews})</span><span className="pd-price">₹{Number(p.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
@@ -4239,7 +4190,7 @@ export default function CreateCampaignSetup() {
                     {autoBidMode === 'default' && (
                       <div className="ccs-auto-default-bid">
                         <div className="ccs-sugg-bid-row">
-                          <button className="ccs-filter-btn-sm">Suggested bid for regular days <ChevronDown size={11} /></button>
+                          <SuggestedBidBasis />
                           <span className="ccs-sugg-val">{addedProducts.length === 0 ? '-' : <>₹{AUTO_DEFAULT_SUGG.sugg.toFixed(2)} <span className="tg-range">(₹{AUTO_DEFAULT_SUGG.min.toFixed(2)}-₹{AUTO_DEFAULT_SUGG.max.toFixed(2)})</span></>}</span>
                         </div>
                         <div className="ccs-bid-field-row">
@@ -4270,12 +4221,12 @@ export default function CreateCampaignSetup() {
                         <div className="ccs-tg-header">
                           <span className="ccs-tg-col-group">TARGETING GROUPS <InfoIcon /></span>
                           <span className="ccs-tg-col-sugg">
-                            <button className="ccs-filter-btn-sm">Suggested bid for regular days <ChevronDown size={11} /></button>
+                            <SuggestedBidBasis />
                           </span>
                           <span className="ccs-tg-col-bid">BID <InfoIcon /></span>
                         </div>
                         {autoGroups.map(g => (
-                          <div key={g.key} className="ccs-tg-row">
+                          <div key={g.key} className={`ccs-tg-row ${g.on ? '' : 'is-off'}`}>
                             <div className="ccs-tg-col-group">
                               <Toggle on={g.on} onChange={v => updateGroup(g.key, 'on', v)} />
                               <span>{g.label}</span>
@@ -4285,9 +4236,11 @@ export default function CreateCampaignSetup() {
                               {addedProducts.length > 0 ? (
                                 <div className="ccs-tg-sugg-block">
                                   <button
-                                    className="ccs-tg-sugg-price"
+                                    type="button"
+                                    className={`ccs-tg-sugg-price ${g.bid === g.sugg.toFixed(2) ? 'is-applied' : ''}`}
                                     onClick={() => updateGroup(g.key, 'bid', g.sugg.toFixed(2))}
-                                    title="Click to apply this bid"
+                                    disabled={!g.on}
+                                    title={g.on ? 'Apply this bid' : undefined}
                                   >
                                     ₹{g.sugg.toFixed(2)}
                                   </button>
@@ -4314,6 +4267,13 @@ export default function CreateCampaignSetup() {
                           </div>
                         ))}
                       </div>
+                    )}
+                    {autoBidMode === 'groups' && autoGroups.some(g => !g.on) && (
+                      <p className="ccs-tg-note">
+                        {autoGroups.some(g => g.on)
+                          ? 'Consider lowering your bid instead of turning off the targeting group'
+                          : 'A minimum of one targeting group is required.'}
+                      </p>
                     )}
                   </div>
                 </label>
@@ -5204,7 +5164,7 @@ export default function CreateCampaignSetup() {
             onNegKeywords={setSpNegKws}
             negProducts={spNegProds}
             onNegProducts={setSpNegProds}
-            ownBrand={allProducts[0]?.brand || 'SoundMax'}
+            ownBrand={allProducts[0]?.brand || BRAND_NAME}
             searchableProducts={[...allProducts, ...INDIV_SUGGESTED.map(p => ({ asin: p.asin, name: p.name }))]}
           />
 

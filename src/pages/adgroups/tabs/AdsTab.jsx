@@ -31,7 +31,7 @@ function AddProductsModal({ existing, onClose, onSave }) {
             <div className="prod-list">
               {list.map(p => (
                 <div key={p.asin} className="prod-row">
-                  <ProductImage imageType={p.imageType} size={44} />
+                  <ProductImage product={p} size={44} />
                   <div className="prod-row-text">
                     <span className="cx-link prod-title">{p.name}</span>
                     <span className="cx-sub">₹{p.price} · ASIN: {p.asin} · SKU: {p.sku}</span>
@@ -152,7 +152,7 @@ export default function AdsTab({ campaign, adGroup }) {
                   <td><button type="button" className={`cx-switch ${isOn ? 'is-on' : ''}`} aria-label={isOn ? 'Enabled' : 'Paused'} onClick={() => toggleProduct(asin)} /></td>
                   <td>
                     <div className="prod-row">
-                      <ProductImage imageType={product?.imageType} size={40} />
+                      <ProductImage product={product} size={40} />
                       <span className="cx-link prod-title">{product?.name || asin}</span>
                     </div>
                   </td>

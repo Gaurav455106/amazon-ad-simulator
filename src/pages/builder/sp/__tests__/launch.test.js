@@ -20,7 +20,7 @@ const baseDraft = (over = {}) => ({
   keywords: [],
   productTargets: [],
   negativeKeywords: [],
-  products: ['B0CF244HDV'],
+  products: ['B0BSXC1Z63'],
   site: 'amazon-and-beyond',
   placements: { top: '30', rest: '0', product: '0' },
   audience: { mode: 'none', audience: '', pct: '0' },
@@ -65,18 +65,18 @@ describe('buildSpLaunch', () => {
     expect(out.campaign.placementAdjustments).toEqual({ top: 30, rest: 0, product: 0 });
     expect(out.campaign.site).toBe('amazon-and-beyond');
     expect(out.campaign.biddingStrategy).toBe('Dynamic bids - down only');
-    expect(out.adGroup.products).toEqual(['B0CF244HDV']);
+    expect(out.adGroup.products).toEqual(['B0BSXC1Z63']);
   });
 
   test('keeps the keyword group as a target instead of dropping it', () => {
-    const d = baseDraft({ targetingType: 'Manual', keywords: [{ type: 'group', bid: '8.03' }, { keyword: 'wireless headphones', matchType: 'Exact', bid: '10' }] });
+    const d = baseDraft({ targetingType: 'Manual', keywords: [{ type: 'group', bid: '8.03' }, { keyword: 'roasted makhana', matchType: 'Exact', bid: '10' }] });
     const kws = buildSpLaunch(d, ids).keywords;
-    expect(kws.map(k => k.keyword)).toEqual([KEYWORD_GROUP_LABEL, 'wireless headphones']);
+    expect(kws.map(k => k.keyword)).toEqual([KEYWORD_GROUP_LABEL, 'roasted makhana']);
     expect(kws.every(k => k.adGroupId === 'agX' && k.campaignId === 'cX')).toBe(true);
   });
 
   test('saves product targets with their match type', () => {
-    const d = baseDraft({ targetingType: 'Manual', manualType: 'product', productTargets: [{ id: 'c1', name: 'Over-Ear Headphones', bid: '9.15' }, { id: 'p', name: 'Sony WH-1000XM5', type: 'Expanded', bid: '3' }] });
+    const d = baseDraft({ targetingType: 'Manual', manualType: 'product', productTargets: [{ id: 'c1', name: 'Edible Seeds', bid: '9.15' }, { id: 'p', name: 'True Elements Chia Seeds', type: 'Expanded', bid: '3' }] });
     expect(buildSpLaunch(d, ids).keywords.map(k => k.matchType)).toEqual(['Category', 'Expanded']);
   });
 
@@ -86,10 +86,10 @@ describe('buildSpLaunch', () => {
   });
 
   test('saves excluded brands and products on the new ad group', () => {
-    const d = baseDraft({ negativeProducts: [{ kind: 'brand', brand: 'SoundMax' }, { kind: 'product', asin: 'B09XS7JWHH', name: 'Sony' }] });
+    const d = baseDraft({ negativeProducts: [{ kind: 'brand', brand: 'Farmley' }, { kind: 'product', asin: 'B06WWMXY3B', name: 'True Elements' }] });
     const out = buildSpLaunch(d, ids).negativeProducts;
     expect(out).toHaveLength(2);
-    expect(out[1]).toMatchObject({ asin: 'B09XS7JWHH', campaignId: 'cX', adGroupId: 'agX', level: 'Ad Group' });
+    expect(out[1]).toMatchObject({ asin: 'B06WWMXY3B', campaignId: 'cX', adGroupId: 'agX', level: 'Ad Group' });
   });
 
   test('a draft without negative products launches with none', () => {
