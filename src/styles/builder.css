@@ -348,8 +348,8 @@
 .ccs-root .ccs-bs-radio-row { border: 0 !important; padding: 8px 0 !important; }
 
 /* ── Settings (measured): beige portfolio select, date buttons ─ */
-.ccs-root .ccs-select-wrap { position: relative; max-width: 296px; }
-.ccs-root .ccs-select-wrap select { appearance: none; -webkit-appearance: none; height: 32px; max-width: 296px; background: #f5f3ef; border: 1px solid #676b6f; border-radius: 4px; padding: 0 36px 0 16px; font-size: 14px; color: var(--c-heading); cursor: pointer; }
+.ccs-root .ccs-select-wrap { position: relative; width: 296px; max-width: 100%; }
+.ccs-root .ccs-select-wrap select { appearance: none; -webkit-appearance: none; height: 32px; background: #f5f3ef; border: 1px solid #676b6f; border-radius: 4px; padding: 0 36px 0 16px; font-size: 14px; color: var(--c-heading); cursor: pointer; }
 .ccs-root .ccs-select-chevron { position: absolute; right: 12px; top: 9px; left: auto; pointer-events: none; }
 .ccs-date-row { display: flex; gap: 8px; }
 .df { position: relative; }
@@ -368,7 +368,7 @@
 .sb-check strong { display: inline; }
 .sb-check .sb-badge { display: inline-block; }
 .ccs-root .ccs-select-wrap .ccs-select-chevron { top: 50%; transform: translateY(-50%); }
-.ccs-root .ccs-select-wrap select { width: 296px; }
+.ccs-root .ccs-select-wrap select { width: 100%; }
 .sb-check > span > strong { font-weight: 400; display: inline-flex; align-items: center; gap: 6px; }
 .sb-check > span > strong .sb-badge { width: auto; padding: 0 6px; font-size: 11px; line-height: 18px; border-radius: 4px; background: #e7e5e1; }
 
