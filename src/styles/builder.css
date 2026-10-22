@@ -194,7 +194,18 @@
 /* ── Products section (measured) ───────────────────────────── */
 .ccs-products-layout { grid-template-columns: 1fr 320px; min-height: 360px; }
 .ccs-products-left { border-right: 1px solid #d5d9d9; }
-.ccs-products-right { background: #f9f8f6; }
+.ccs-products-right { background: #f9f8f6; display: flex; flex-direction: column; min-height: 0; }
+/* The added list fills the panel down to the bottom of the left column instead of a fixed 380px cap;
+   `contain: size` stops its own content from stretching the grid row. */
+.ccs-products-right .ccs-added-list { flex: 1 1 0; min-height: 0; max-height: none; overflow-y: auto; contain: size; }
+.ccs-products-layout .ccs-product-list { max-height: 560px; }
+/* Always-visible scrollbars, so it's clear more products sit below the fold (macOS hides overlay bars). */
+.ccs-products-layout .ccs-product-list::-webkit-scrollbar,
+.ccs-products-right .ccs-added-list::-webkit-scrollbar { width: 10px; }
+.ccs-products-layout .ccs-product-list::-webkit-scrollbar-thumb,
+.ccs-products-right .ccs-added-list::-webkit-scrollbar-thumb { background: #b9bcbf; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+.ccs-products-layout .ccs-product-list::-webkit-scrollbar-track,
+.ccs-products-right .ccs-added-list::-webkit-scrollbar-track { background: #eeece8; }
 .ccs-products-left .ccs-tab-row { padding: 0 16px; gap: 20px; }
 .ccs-products-left .ccs-tab { font-size: 14px; padding: 12px 0 8px; }
 .ccs-search-row { padding: 12px; gap: 6px; }
