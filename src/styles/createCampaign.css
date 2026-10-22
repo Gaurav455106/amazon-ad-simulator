@@ -1,0 +1,61 @@
+/* "Choose your campaign type" (/cb) — measured from advertising.amazon.in (Oct 2026). */
+.cct-page { min-height: 100%; background: #fff; color: #161d26; font-family: var(--c-font); }
+.cct-subheader { padding: 8px 24px; border-bottom: 1px solid #e7e6e4; }
+.cct-country { display: inline-flex; align-items: center; gap: 18px; height: 32px; padding: 0 12px 0 14px; border: 1px solid #676b6f; border-radius: 4px; background: #f5f3ef; font-family: var(--c-font-text); font-stretch: var(--c-stretch-text); font-size: 14px; color: #161d26; cursor: pointer; }
+.cct-title-row { display: flex; align-items: center; gap: 24px; padding: 20px 20px 16px; border-bottom: 1px solid #e7e6e4; }
+.cct-title { margin: 0; font-family: var(--c-font-display); font-stretch: var(--c-stretch-display); font-size: 40px; line-height: 48px; font-weight: 700; color: #161d26; }
+.cct-drafts { height: 32px; padding: 0 16px; border: 1px solid #676b6f; border-radius: 6px; background: #f5f3ef; font-family: var(--c-font-text); font-stretch: var(--c-stretch-text); font-size: 13px; color: #161d26; cursor: pointer; }
+.cct-drafts:hover, .cct-country:hover { background: #ebe8e2; }
+.cct-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 616px)); justify-content: center; gap: 36px; padding: 20px 24px 48px; align-items: start; }
+.cct-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.cct-type-card { background: #fff; border: 1px solid #e7e6e4; border-radius: 8px; box-shadow: 0 2px 3px -1px rgba(45, 50, 57, 0.2); overflow: hidden; }
+.cct-type-head { background: #f5f3ef; border-bottom: 1px solid #e7e6e4; }
+.cct-type-head h2 { margin: 0; padding: 16px 16px 16px; font-family: var(--c-font-display); font-stretch: var(--c-stretch-display); font-size: 24px; line-height: 28px; font-weight: 700; color: #161d26; }
+.cct-type-tabs { display: flex; gap: 20px; padding: 0 20px; }
+.cct-type-tab { padding: 0 0 10px; margin-top: -2px; border: 0; border-bottom: 3px solid transparent; background: none; font-family: var(--c-font-text); font-stretch: var(--c-stretch-text); font-size: 14px; line-height: 20px; color: #2d3239; cursor: pointer; }
+.cct-type-tab.is-active { font-weight: 700; color: #161d26; border-bottom-color: #1f5ea8; }
+.cct-type-body { display: grid; grid-template-columns: 314px minmax(0, 1fr); gap: 12px; padding: 24px 20px 24px 8px; }
+
+/* Carousel: arrows outside the picture, expand icon top-right, dots below. */
+.cct-carousel { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cct-carousel-stage { position: relative; display: grid; grid-template-columns: 24px 1fr 24px; align-items: center; gap: 4px; width: 100%; }
+.cct-carousel-image { aspect-ratio: 280 / 170; display: flex; align-items: center; justify-content: center; }
+.cct-art { width: 100%; height: 100%; }
+.cct-arrow { display: flex; align-items: center; justify-content: center; width: 24px; height: 32px; border: 0; background: none; color: #161d26; cursor: pointer; border-radius: 4px; }
+.cct-arrow:hover { background: #f5f3ef; }
+.cct-expand { position: absolute; top: -10px; right: 18px; display: flex; padding: 4px; border: 0; background: none; color: #161d26; cursor: pointer; border-radius: 4px; }
+.cct-expand:hover { background: #f5f3ef; }
+.cct-dots { display: flex; justify-content: center; gap: 5px; }
+.cct-dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: #8d9096; cursor: pointer; }
+.cct-dot.is-active { background: #161d26; }
+
+.cct-type-copy { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding-top: 10px; max-width: 267px; }
+.cct-type-headline, .cct-type-sub { margin: 0 0 2px; font-family: "Amazon Ember", "Public Sans", Arial, sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; color: #161d26; }
+.cct-type-copy p { margin: 0; font-family: "Amazon Ember", "Public Sans", Arial, sans-serif; font-size: 13px; line-height: 19px; color: #161d26; }
+.cct-type-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-family: var(--c-font-text); font-stretch: var(--c-stretch-text); font-size: 14px; line-height: 20px; color: #0053ca; text-decoration: none; }
+.cct-type-link:hover { text-decoration: underline; }
+.cct-type-create { height: 32px; margin-top: 10px; border: 0; border-radius: 6px; background: #161d26; color: #fff; font-family: var(--c-font-text); font-stretch: var(--c-stretch-text); font-size: 14px; cursor: pointer; }
+.cct-type-create:hover { background: #2d3239; }
+
+/* Expanded slide dialog */
+.cct-modal-scrim { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; background: rgba(15, 17, 17, 0.6); }
+.cct-modal { width: min(800px, calc(100vw - 32px)); background: #fff; border-radius: 8px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); padding-bottom: 20px; }
+.cct-modal header { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 14px 18px; border-bottom: 1px solid #e7e6e4; }
+.cct-modal h2 { margin: 0; font-family: var(--c-font-display); font-stretch: var(--c-stretch-display); font-size: 18px; font-weight: 700; }
+.cct-modal-close { display: flex; padding: 4px; border: 2px solid #1f5ea8; border-radius: 6px; background: #fff; cursor: pointer; color: #161d26; }
+.cct-modal-body { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; padding: 24px 8px 8px; }
+.cct-modal figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cct-modal figure .cct-art { width: min(520px, 100%); height: auto; }
+.cct-modal figcaption { font-family: "Amazon Ember", "Public Sans", Arial, sans-serif; font-size: 13px; color: #161d26; }
+.cct-modal .cct-arrow { width: 40px; height: 40px; }
+
+@media (max-width: 1100px) {
+  .cct-grid { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+}
+@media (max-width: 640px) {
+  .cct-type-body { grid-template-columns: 1fr; padding: 16px; }
+  .cct-type-copy { max-width: none; }
+  .cct-title { font-size: 30px; line-height: 36px; }
+  .cct-title-row { flex-wrap: wrap; gap: 12px; }
+}

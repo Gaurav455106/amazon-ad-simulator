@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { generatePerformanceData, simulateAuction } from '../utils/simulation';
+import { applyTick } from '../utils/liveTick';
+import { localISODate } from '../utils/dateRanges';
 
 // ── User management (plain localStorage, not in Zustand) ──
 export const getUsers = () => {
@@ -23,6 +24,8 @@ const userStorage = createJSONStorage(() => ({
   removeItem: (name) => localStorage.removeItem(`${name}__${getCurrentUser()}`),
 }));
 
+const daysAgo = (n) => localISODate(new Date(Date.now() - n * 86400000));
+
 const initialCampaigns = [
   {
     id: 'c1',
@@ -30,14 +33,14 @@ const initialCampaigns = [
     type: 'Sponsored Products',
     status: 'Enabled',
     targetingType: 'Manual',
-    budget: 50,
+    budget: 500,
     budgetType: 'Daily',
-    startDate: '2024-01-01',
+    startDate: daysAgo(75),
     endDate: '',
     biddingStrategy: 'Dynamic bids - down only',
     portfolioId: 'p1',
-    createdAt: '2024-01-01',
-    metrics: { impressions: 45320, clicks: 1240, spend: 38.40, orders: 62, sales: 1890.50, ctr: 2.74, cpc: 0.31, acos: 2.03, roas: 49.23, cvr: 5.0 }
+    createdAt: daysAgo(75),
+    metrics: { impressions: 45320, clicks: 1240, spend: 10752.00, orders: 62, sales: 103977.50 }
   },
   {
     id: 'c2',
@@ -45,46 +48,57 @@ const initialCampaigns = [
     type: 'Sponsored Brands',
     status: 'Enabled',
     targetingType: 'Manual',
-    budget: 30,
+    budget: 300,
     budgetType: 'Daily',
-    startDate: '2024-01-15',
+    startDate: daysAgo(60),
     endDate: '',
     biddingStrategy: 'Fixed bid',
     portfolioId: 'p1',
-    createdAt: '2024-01-15',
-    metrics: { impressions: 28900, clicks: 820, spend: 28.70, orders: 41, sales: 1120.00, ctr: 2.84, cpc: 0.35, acos: 2.56, roas: 39.02, cvr: 5.0 }
+    createdAt: daysAgo(60),
+    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 }
   },
   {
     id: 'c3',
     name: 'Competitor Targeting - Sponsored Display',
     type: 'Sponsored Display',
     status: 'Paused',
-    targetingType: 'Auto',
-    budget: 20,
+    targetingType: 'Contextual + Audiences',
+    budget: 200,
     budgetType: 'Daily',
-    startDate: '2024-02-01',
+    startDate: daysAgo(45),
     endDate: '',
-    biddingStrategy: 'Dynamic bids - up and down',
+    biddingStrategy: 'Optimize for page visits',
+    costType: 'CPC',
+    goal: 'consideration',
+    // The five targets the console's Display builder pre-adds.
+    sdTargets: [
+      { type: 'Contextual', name: 'Similar to advertised products', bid: 10.8 },
+      { type: 'Audience', name: 'Views remarketing · Similar to advertised products · 30 days', bid: 10.8 },
+      { type: 'Audience', name: 'Views remarketing · Advertised products · 30 days', bid: 10.8 },
+      { type: 'Audience', name: 'Purchases remarketing · Related to advertised products · 30 days', bid: 10.8 },
+      { type: 'Audience', name: 'Purchases remarketing · Advertised products · 30 days', bid: 10.8 },
+    ],
+    sdCreative: { adFormat: 'image', products: ['B0CF23X3HB'] },
     portfolioId: 'p2',
-    createdAt: '2024-02-01',
-    metrics: { impressions: 12400, clicks: 180, spend: 14.20, orders: 9, sales: 245.00, ctr: 1.45, cpc: 0.79, acos: 5.80, roas: 17.25, cvr: 5.0 }
+    createdAt: daysAgo(45),
+    metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 13475.00 }
   }
 ];
 
 const initialAdGroups = [
-  { id: 'ag1', campaignId: 'c1', name: 'Core Keywords', status: 'Enabled', defaultBid: 0.75, metrics: { impressions: 28000, clicks: 780, spend: 24.10, orders: 40, sales: 1200.00 } },
-  { id: 'ag2', campaignId: 'c1', name: 'Long Tail', status: 'Enabled', defaultBid: 0.45, metrics: { impressions: 17320, clicks: 460, spend: 14.30, orders: 22, sales: 690.50 } },
-  { id: 'ag3', campaignId: 'c2', name: 'Brand Terms', status: 'Enabled', defaultBid: 0.60, metrics: { impressions: 28900, clicks: 820, spend: 28.70, orders: 41, sales: 1120.00 } },
-  { id: 'ag4', campaignId: 'c3', name: 'Competitor ASINs', status: 'Paused', defaultBid: 0.90, metrics: { impressions: 12400, clicks: 180, spend: 14.20, orders: 9, sales: 245.00 } },
+  { id: 'ag1', products: ['B0CF244HDV', 'B0CF24MSGB'], campaignId: 'c1', name: 'Core Keywords', status: 'Enabled', defaultBid: 9.00, metrics: { impressions: 28000, clicks: 780, spend: 6748.00, orders: 40, sales: 66000.00 } },
+  { id: 'ag2', products: ['B0CF277SZN'], campaignId: 'c1', name: 'Long Tail', status: 'Enabled', defaultBid: 5.40, metrics: { impressions: 17320, clicks: 460, spend: 4004.00, orders: 22, sales: 37977.50 } },
+  { id: 'ag3', products: ['B0CF244HDV', 'B0CF24MSGB', 'B0CF277SZN'], campaignId: 'c2', name: 'Brand Terms', status: 'Enabled', defaultBid: 7.20, metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 } },
+  { id: 'ag4', products: ['B0CF23X3HB'], campaignId: 'c3', name: 'Competitor ASINs', status: 'Paused', defaultBid: 10.80, metrics: { impressions: 12400, clicks: 180, spend: 3976.00, orders: 9, sales: 13475.00 } },
 ];
 
 const initialKeywords = [
-  { id: 'k1', adGroupId: 'ag1', campaignId: 'c1', keyword: 'wireless headphones', matchType: 'Exact', bid: 0.85, status: 'Enabled', suggestedBid: 0.92, metrics: { impressions: 12000, clicks: 380, spend: 11.40, orders: 20, sales: 620.00 } },
-  { id: 'k2', adGroupId: 'ag1', campaignId: 'c1', keyword: 'bluetooth headphones', matchType: 'Phrase', bid: 0.70, status: 'Enabled', suggestedBid: 0.78, metrics: { impressions: 9500, clicks: 240, spend: 7.80, orders: 13, sales: 390.00 } },
-  { id: 'k3', adGroupId: 'ag1', campaignId: 'c1', keyword: 'noise cancelling', matchType: 'Broad', bid: 0.55, status: 'Enabled', suggestedBid: 0.60, metrics: { impressions: 6500, clicks: 160, spend: 4.90, orders: 7, sales: 190.00 } },
-  { id: 'k4', adGroupId: 'ag2', campaignId: 'c1', keyword: 'best wireless headphones for running', matchType: 'Phrase', bid: 0.45, status: 'Enabled', suggestedBid: 0.50, metrics: { impressions: 3200, clicks: 95, spend: 3.20, orders: 8, sales: 240.00 } },
-  { id: 'k5', adGroupId: 'ag2', campaignId: 'c1', keyword: 'affordable noise cancelling headphones', matchType: 'Broad', bid: 0.40, status: 'Paused', suggestedBid: 0.45, metrics: { impressions: 2100, clicks: 58, spend: 2.10, orders: 4, sales: 120.00 } },
-  { id: 'k6', adGroupId: 'ag3', campaignId: 'c2', keyword: 'SoundMax headphones', matchType: 'Exact', bid: 0.60, status: 'Enabled', suggestedBid: 0.65, metrics: { impressions: 28900, clicks: 820, spend: 28.70, orders: 41, sales: 1120.00 } },
+  { id: 'k1', adGroupId: 'ag1', campaignId: 'c1', keyword: 'wireless headphones', matchType: 'Exact', bid: 10.20, status: 'Enabled', suggestedBid: 11.04, metrics: { impressions: 12000, clicks: 380, spend: 3192.00, orders: 20, sales: 34100.00 } },
+  { id: 'k2', adGroupId: 'ag1', campaignId: 'c1', keyword: 'bluetooth headphones', matchType: 'Phrase', bid: 8.40, status: 'Enabled', suggestedBid: 9.36, metrics: { impressions: 9500, clicks: 240, spend: 2184.00, orders: 13, sales: 21450.00 } },
+  { id: 'k3', adGroupId: 'ag1', campaignId: 'c1', keyword: 'noise cancelling', matchType: 'Broad', bid: 6.60, status: 'Enabled', suggestedBid: 7.20, metrics: { impressions: 6500, clicks: 160, spend: 1372.00, orders: 7, sales: 10450.00 } },
+  { id: 'k4', adGroupId: 'ag2', campaignId: 'c1', keyword: 'best wireless headphones for running', matchType: 'Phrase', bid: 5.40, status: 'Enabled', suggestedBid: 6.00, metrics: { impressions: 3200, clicks: 95, spend: 896.00, orders: 8, sales: 13200.00 } },
+  { id: 'k5', adGroupId: 'ag2', campaignId: 'c1', keyword: 'affordable noise cancelling headphones', matchType: 'Broad', bid: 4.80, status: 'Paused', suggestedBid: 5.40, metrics: { impressions: 2100, clicks: 58, spend: 588.00, orders: 4, sales: 6600.00 } },
+  { id: 'k6', adGroupId: 'ag3', campaignId: 'c2', keyword: 'SoundMax headphones', matchType: 'Exact', bid: 7.20, status: 'Enabled', suggestedBid: 7.80, metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 } },
 ];
 
 const initialNegativeKeywords = [
@@ -104,7 +118,7 @@ const initialSbAds = [
     headline: 'Premium Audio for Every Moment',
     landingPage: 'store',
     products: ['B0CF244HDV', 'B0CF24MSGB', 'B0CF277SZN'],
-    metrics: { impressions: 28900, clicks: 820, spend: 28.70, orders: 41, sales: 1120.00 }
+    metrics: { impressions: 28900, clicks: 820, spend: 8036.00, orders: 41, sales: 61600.00 }
   }
 ];
 
@@ -141,6 +155,55 @@ const generateChartData = () => {
   return data;
 };
 
+const EMPTY_AG_METRICS = { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 };
+
+/**
+ * v4: the real console nests every SB and Display ad inside an ad group.
+ * Older saves created SB/SD campaigns without one, so give each campaign a
+ * default ad group and move its loose keywords into it.
+ */
+export function ensureAdGroupsForAllCampaigns(state) {
+  const campaigns = state.campaigns || [];
+  const adGroups = state.adGroups || [];
+  const created = campaigns
+    .filter(c => !adGroups.some(ag => ag.campaignId === c.id))
+    .map(c => ({ id: `ag-${c.id}`, campaignId: c.id, name: 'Ad group 1', status: 'Enabled', defaultBid: 0, metrics: { ...EMPTY_AG_METRICS } }));
+  const firstAdGroupOf = (campaignId) =>
+    created.find(ag => ag.campaignId === campaignId)?.id || adGroups.find(ag => ag.campaignId === campaignId)?.id || null;
+  const keywords = (state.keywords || []).map(k => (k.adGroupId ? k : { ...k, adGroupId: firstAdGroupOf(k.campaignId) }));
+  return { ...state, adGroups: [...adGroups, ...created], keywords };
+}
+
+// ── Change history (what the console's History pages show) ──
+const HISTORY_LIMIT = 500;
+const TRACKED_FIELDS = {
+  name: 'Name', status: 'Status', budget: 'Budget', defaultBid: 'Default bid', bid: 'Bid',
+  endDate: 'End date', startDate: 'Start date', biddingStrategy: 'Bidding strategy', portfolioId: 'Portfolio',
+  placementAdjustments: 'Placement bid adjustment',
+};
+const STATUS_WORD = { Enabled: 'Delivering', Paused: 'Paused', Archived: 'Archived' };
+const displayValue = (field, v) => {
+  if (v === undefined || v === null || v === '') return '-';
+  if (field === 'status') return STATUS_WORD[v] || v;
+  if (field === 'budget' || field === 'defaultBid' || field === 'bid') return `₹${Number(v).toFixed(2)}`;
+  if (field === 'placementAdjustments') return Object.entries(v).map(([k, n]) => `${k}: ${n}%`).join(', ');
+  return String(v);
+};
+const historyEntry = (e) => ({ id: `h${Date.now()}${Math.random()}`, at: new Date().toISOString(), ...e });
+const appendHistory = (history, entries) => (entries.length ? [...entries, ...(history || [])].slice(0, HISTORY_LIMIT) : history || []);
+function changeEntries(level, before, updates, ctx) {
+  if (!before) return [];
+  return Object.entries(updates)
+    .filter(([field, v]) => TRACKED_FIELDS[field] && JSON.stringify(before[field]) !== JSON.stringify(v))
+    .map(([field, v]) => historyEntry({
+      level: level === 'Keyword' ? 'Ad group' : level,
+      ...ctx,
+      changeType: level === 'Keyword' ? `Keyword ${TRACKED_FIELDS[field].toLowerCase()} - ${ctx.subject}` : `${level} ${TRACKED_FIELDS[field].toLowerCase()}`,
+      from: displayValue(field, before[field]),
+      to: displayValue(field, v),
+    }));
+}
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -153,9 +216,14 @@ export const useStore = create(
       negativeKeywords: initialNegativeKeywords,
       portfolios: initialPortfolios,
       products: initialProducts,
+      history: [],
+      negativeProducts: [],
+      accountSettings: { budgetCap: 'campaign', budgetCapAmount: '', dailyIncrease: '25' },
       sbAds: initialSbAds,
       chartData: generateChartData(),
       dateRange: '30',
+      // Console date range: a preset key, or 'custom' with ISO from/to dates.
+      consoleRange: { preset: 'last7', from: null, to: null },
       selectedCampaignIds: [],
       notifications: [
         { id: 'n1', type: 'warning', message: 'Campaign "Summer Sale" is running low on daily budget', time: '2 hours ago', read: false },
@@ -165,27 +233,42 @@ export const useStore = create(
 
       // Campaign Actions
       addCampaign: (campaign) => set((state) => ({
-        campaigns: [...state.campaigns, { id: `c${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 }, ...campaign, createdAt: new Date().toISOString().split('T')[0] }]
+        campaigns: [...state.campaigns, { id: `c${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 }, ...campaign, createdAt: localISODate() }]
       })),
-      updateCampaign: (id, updates) => set((state) => ({
-        campaigns: state.campaigns.map(c => c.id === id ? { ...c, ...updates } : c)
-      })),
+      updateCampaign: (id, updates) => set((state) => {
+        const before = state.campaigns.find(c => c.id === id);
+        return {
+          campaigns: state.campaigns.map(c => c.id === id ? { ...c, ...updates } : c),
+          history: appendHistory(state.history, changeEntries('Campaign', before, updates, { campaignId: id })),
+        };
+      }),
       deleteCampaigns: (ids) => set((state) => ({
-        campaigns: state.campaigns.filter(c => !ids.includes(c.id))
+        campaigns: state.campaigns.filter(c => !ids.includes(c.id)),
+        adGroups: state.adGroups.filter(ag => !ids.includes(ag.campaignId)),
+        keywords: state.keywords.filter(k => !ids.includes(k.campaignId)),
+        negativeKeywords: state.negativeKeywords.filter(n => !ids.includes(n.campaignId)),
+        negativeProducts: (state.negativeProducts || []).filter(n => !ids.includes(n.campaignId)),
       })),
-      toggleCampaignStatus: (id) => set((state) => ({
-        campaigns: state.campaigns.map(c => c.id === id ? { ...c, status: c.status === 'Enabled' ? 'Paused' : 'Enabled' } : c)
-      })),
+      toggleCampaignStatus: (id) => get().updateCampaign(id, {
+        status: get().campaigns.find(c => c.id === id)?.status === 'Enabled' ? 'Paused' : 'Enabled',
+      }),
 
       // Ad Group Actions
       addAdGroup: (adGroup) => set((state) => ({
-        adGroups: [...state.adGroups, { ...adGroup, id: `ag${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
+        adGroups: [...state.adGroups, { id: `ag${Date.now()}`, ...adGroup, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
       })),
-      updateAdGroup: (id, updates) => set((state) => ({
-        adGroups: state.adGroups.map(ag => ag.id === id ? { ...ag, ...updates } : ag)
-      })),
+      updateAdGroup: (id, updates) => set((state) => {
+        const before = state.adGroups.find(ag => ag.id === id);
+        return {
+          adGroups: state.adGroups.map(ag => ag.id === id ? { ...ag, ...updates } : ag),
+          history: appendHistory(state.history, changeEntries('Ad group', before, updates, { campaignId: before?.campaignId, adGroupId: id })),
+        };
+      }),
       deleteAdGroup: (id) => set((state) => ({
-        adGroups: state.adGroups.filter(ag => ag.id !== id)
+        adGroups: state.adGroups.filter(ag => ag.id !== id),
+        keywords: state.keywords.filter(k => k.adGroupId !== id),
+        negativeKeywords: state.negativeKeywords.filter(n => n.adGroupId !== id),
+        negativeProducts: (state.negativeProducts || []).filter(n => n.adGroupId !== id),
       })),
 
       // Keyword Actions
@@ -193,18 +276,40 @@ export const useStore = create(
         keywords: [...state.keywords, { ...keyword, id: `k${Date.now()}`, suggestedBid: parseFloat((keyword.bid * 1.1).toFixed(2)), metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
       })),
       addKeywords: (kws) => set((state) => ({
-        keywords: [...state.keywords, ...kws.map(k => ({ ...k, id: `k${Date.now()}${Math.random()}`, suggestedBid: parseFloat((k.bid * 1.1).toFixed(2)), metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }))]
+        keywords: [...state.keywords, ...kws.map(k => ({ ...k, id: `k${Date.now()}${Math.random()}`, suggestedBid: parseFloat((k.bid * 1.1).toFixed(2)), metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }))],
+        history: appendHistory(state.history, kws.map(k => historyEntry({
+          level: 'Ad group', campaignId: k.campaignId, adGroupId: k.adGroupId,
+          changeType: `Keyword (${(k.matchType || '').toLowerCase()}) - ${k.keyword}`, from: '-', to: 'Added',
+        }))),
       })),
-      updateKeyword: (id, updates) => set((state) => ({
-        keywords: state.keywords.map(k => k.id === id ? { ...k, ...updates } : k)
-      })),
+      updateKeyword: (id, updates) => set((state) => {
+        const before = state.keywords.find(k => k.id === id);
+        return {
+          keywords: state.keywords.map(k => k.id === id ? { ...k, ...updates } : k),
+          history: appendHistory(state.history, changeEntries('Keyword', before, updates, { campaignId: before?.campaignId, adGroupId: before?.adGroupId, subject: before?.keyword })),
+        };
+      }),
       deleteKeyword: (id) => set((state) => ({
         keywords: state.keywords.filter(k => k.id !== id)
       })),
 
       // Negative Keyword Actions
       addNegativeKeywords: (nks) => set((state) => ({
-        negativeKeywords: [...state.negativeKeywords, ...nks.map(nk => ({ ...nk, id: `nk${Date.now()}${Math.random()}` }))]
+        negativeKeywords: [...state.negativeKeywords, ...nks.map(nk => ({ ...nk, id: `nk${Date.now()}${Math.random()}` }))],
+        history: appendHistory(state.history, nks.map(nk => historyEntry({
+          level: nk.adGroupId ? 'Ad group' : 'Campaign', campaignId: nk.campaignId, adGroupId: nk.adGroupId,
+          changeType: `Negative keywords(${(nk.matchType || '').toLowerCase()}) - ${nk.keyword}`, from: '-', to: 'Added',
+        }))),
+      })),
+      addNegativeProducts: (nps) => set((state) => ({
+        negativeProducts: [...(state.negativeProducts || []), ...nps.map(np => ({ ...np, id: `np${Date.now()}${Math.random()}` }))],
+        history: appendHistory(state.history, nps.map(np => historyEntry({
+          level: np.adGroupId ? 'Ad group' : 'Campaign', campaignId: np.campaignId, adGroupId: np.adGroupId,
+          changeType: `Negative product - ${np.asin || `brand: ${np.brand}`}`, from: '-', to: 'Added',
+        }))),
+      })),
+      deleteNegativeProduct: (id) => set((state) => ({
+        negativeProducts: (state.negativeProducts || []).filter(np => np.id !== id),
       })),
       deleteNegativeKeyword: (id) => set((state) => ({
         negativeKeywords: state.negativeKeywords.filter(nk => nk.id !== id)
@@ -228,6 +333,8 @@ export const useStore = create(
 
       // UI
       setDateRange: (range) => set({ dateRange: range }),
+      setConsoleRange: (consoleRange) => set({ consoleRange }),
+      setAccountSettings: (accountSettings) => set({ accountSettings }),
       setSelectedCampaignIds: (ids) => set({ selectedCampaignIds: ids }),
       markNotificationRead: (id) => set((state) => ({
         notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
@@ -244,33 +351,14 @@ export const useStore = create(
         useStore.persist.rehydrate();
       },
 
-      // Simulate live data tick
-      simulateTick: () => set((state) => ({
-        campaigns: state.campaigns.map(c => {
-          if (c.status !== 'Enabled') return c;
-          const delta = generatePerformanceData();
-          return {
-            ...c,
-            metrics: {
-              impressions: c.metrics.impressions + delta.impressions,
-              clicks: c.metrics.clicks + delta.clicks,
-              spend: parseFloat((c.metrics.spend + delta.spend).toFixed(2)),
-              orders: c.metrics.orders + delta.orders,
-              sales: parseFloat((c.metrics.sales + delta.sales).toFixed(2)),
-              ctr: parseFloat(((c.metrics.clicks + delta.clicks) / (c.metrics.impressions + delta.impressions) * 100).toFixed(2)),
-              cpc: parseFloat(((c.metrics.spend + delta.spend) / Math.max(1, c.metrics.clicks + delta.clicks)).toFixed(2)),
-              acos: parseFloat(((c.metrics.spend + delta.spend) / Math.max(1, c.metrics.sales + delta.sales) * 100).toFixed(2)),
-              roas: parseFloat(((c.metrics.sales + delta.sales) / Math.max(0.01, c.metrics.spend + delta.spend)).toFixed(2)),
-              cvr: parseFloat(((c.metrics.orders + delta.orders) / Math.max(1, c.metrics.clicks + delta.clicks) * 100).toFixed(2)),
-            }
-          };
-        })
-      })),
+      // Simulate live data tick (see utils/liveTick.js for the delivery rules)
+      simulateTick: () => set((state) => applyTick(state)),
     }),
     {
       name: 'amazon-ads-store',
       storage: userStorage,
-      version: 3,
+      version: 4,
+      migrate: (persisted, version) => (version < 4 ? ensureAdGroupsForAllCampaigns(persisted) : persisted),
       partialize: (state) => {
         // eslint-disable-next-line no-unused-vars
         const { currentUserName, switchUser, ...rest } = state;

@@ -18,7 +18,7 @@
   --radius: 4px;
 }
 
-body { font-family: 'Amazon Ember', 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: var(--text-primary); background: var(--amazon-light); }
+body { font-family: "Amazon Ember", "Public Sans", Arial, sans-serif; font-size: 13px; color: var(--text-primary); background: var(--amazon-light); }
 
 /* ===== APP SHELL ===== */
 .app-shell { display: flex; flex-direction: column; height: 100vh; }
@@ -447,42 +447,6 @@ body { font-family: 'Amazon Ember', 'Helvetica Neue', Arial, sans-serif; font-si
 .bidding-option p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
 /* ===== CREATE CAMPAIGN CHOICE PAGE ===== */
-.cc-page { padding: 0; }
-.cc-subheader { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: var(--bg-secondary); border-bottom: 1px solid var(--amazon-border); font-size: 13px; color: var(--text-secondary); }
-.cc-country-selector { display: flex; align-items: center; gap: 6px; border: 1px solid var(--amazon-border); border-radius: var(--radius); padding: 5px 10px; background: white; cursor: pointer; font-size: 13px; }
-.cc-title-row { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 8px; }
-.cc-title { font-size: 20px; font-weight: 700; color: var(--text-primary); }
-.cc-learn-more-link { font-size: 13px; color: var(--amazon-blue); text-decoration: none; }
-.cc-learn-more-link:hover { text-decoration: underline; }
-.cc-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
-.cc-left { display: flex; flex-direction: column; gap: 16px; }
-.cc-right { display: flex; flex-direction: column; }
-.cc-card { background: white; border: 1px solid var(--amazon-border); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-.cc-card-full { flex: 1; }
-.cc-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: 220px; }
-.cc-card-body-vertical { display: flex; flex-direction: column; flex: 1; }
-.cc-card-title { padding: 14px 16px 10px; font-size: 16px; font-weight: 700; border-bottom: 1px solid var(--amazon-border); }
-.cc-card-image { overflow: hidden; background: #f8f8f8; display: flex; align-items: center; justify-content: center; }
-.cc-card-image-tall { flex: 1; min-height: 260px; }
-.cc-card-info { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.cc-card-headline { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
-.cc-card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; flex: 1; }
-.cc-learn-link { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--amazon-blue); text-decoration: none; }
-.cc-learn-link:hover { text-decoration: underline; }
-.cc-create-btn { background: #232f3e; color: white; border: none; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-.cc-create-btn:hover { background: #131a22; }
-.cc-create-btn-disabled { background: #9ca3af !important; cursor: not-allowed !important; }
-.cc-card-coming-soon { position: relative; opacity: 0.75; }
-.cc-coming-soon-badge { position: absolute; top: 10px; right: 10px; background: #e47911; color: white; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; z-index: 2; letter-spacing: 0.5px; text-transform: uppercase; }
-.cc-carousel { position: relative; width: 100%; overflow: hidden; }
-.cc-carousel-inner { display: flex; transition: transform 0.35s ease; }
-.cc-carousel-slide { flex-shrink: 0; width: 100%; }
-.cc-carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.9); border: 1px solid #ddd; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-.cc-carousel-btn.prev, .cc-carousel-btn.left { left: 6px; }
-.cc-carousel-btn.next, .cc-carousel-btn.right { right: 6px; }
-.cc-carousel-dots { display: flex; justify-content: center; gap: 5px; padding: 6px 0 2px; }
-.cc-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; border: none; cursor: pointer; padding: 0; }
-.cc-dot.active { background: #232f3e; }
 
 /* ===== CAMPAIGN SETUP PAGE ===== */
 .ccs-page { max-width: 960px; margin: 0 auto; padding: 20px 24px 80px; }

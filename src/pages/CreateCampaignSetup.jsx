@@ -1,186 +1,59 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Fragment, useState, useMemo, useEffect } from 'react';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Info, ChevronDown, ChevronUp, ChevronRight, Search, X, ToggleLeft, ToggleRight, Shirt, Image as ImageIcon, Play } from 'lucide-react';
+import { SUGGESTED_KWS } from '../data/keywordSuggestions';
+import ProductImage from '../components/console/ProductImage';
+import { PRODUCT_IMAGES } from '../data/productImages';
+import { localISODate, consoleTimestamp } from '../utils/dateRanges';
+import { spForecast } from '../utils/spForecast';
+import { CampaignSetupCard, SitesCard, PresetSettingsCard } from './builder/sp/SetupCards';
+import { AudienceAdjustments, AdjustmentSummary, ForecastPanel } from './builder/sp/BidPanels';
+import { SITE_AMAZON_BUSINESS } from './builder/sp/constants';
+import IndivProductRow from './builder/sp/IndivProductRow';
+import NegativeCards from './builder/sp/NegativeCards';
+import DateField from './builder/sp/DateField';
+import SbProductsCard from './builder/sb/SbProductsCard';
+import SbSitesCard from './builder/sb/SbSitesCard';
+import SbKeywordTargeting from './builder/sb/SbKeywordTargeting';
+import SdBuilder from './builder/sd/SdBuilder';
+import { SB_MIN_PRODUCTS } from './builder/sb/limits';
+import { validateSbDraft, buildSbLaunch } from './builder/sb/launch';
+import { validateSpDraft, buildSpLaunch, validBid } from './builder/sp/launch';
+import { campaignPath, ROUTES } from '../routes';
+
+import { ChevronDown, ChevronUp, ChevronRight, Search, X, CircleHelp } from 'lucide-react';
+import Info from '../components/console/InfoGlyph';
 
 const TYPE_MAP = {
-  'sponsored-products': 'Sponsored Products',
-  'sponsored-brands': 'Sponsored Brands',
-  'display': 'Sponsored Display',
+  sp: 'Sponsored Products',
+  sb: 'Sponsored Brands',
+  sd: 'Sponsored Display',
 };
 
-const PRODUCT_IMAGES = {
-  'over-ear-black': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#f0f2f4"/>
-      <path d="M22 54 C22 28 78 28 78 54" stroke="#1a1a2e" strokeWidth="6" fill="none" strokeLinecap="round"/>
-      <rect x="12" y="50" width="18" height="26" rx="9" fill="#1a1a2e"/>
-      <rect x="70" y="50" width="18" height="26" rx="9" fill="#1a1a2e"/>
-      <rect x="15" y="53" width="12" height="20" rx="6" fill="#2d2d4e"/>
-      <rect x="73" y="53" width="12" height="20" rx="6" fill="#2d2d4e"/>
-      <circle cx="21" cy="63" r="3" fill="#e47911" opacity="0.8"/>
-    </svg>
-  ),
-  'earbuds-white': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#f8f8f8"/>
-      <ellipse cx="33" cy="54" rx="11" ry="14" fill="white" stroke="#ddd" strokeWidth="1.5"/>
-      <rect x="29" y="30" width="8" height="24" rx="4" fill="white" stroke="#ddd" strokeWidth="1.5"/>
-      <circle cx="33" cy="54" r="4" fill="#eee" stroke="#ccc" strokeWidth="1"/>
-      <ellipse cx="67" cy="54" rx="11" ry="14" fill="white" stroke="#ddd" strokeWidth="1.5"/>
-      <rect x="63" y="30" width="8" height="24" rx="4" fill="white" stroke="#ddd" strokeWidth="1.5"/>
-      <circle cx="67" cy="54" r="4" fill="#eee" stroke="#ccc" strokeWidth="1"/>
-      <rect x="25" y="72" width="50" height="16" rx="8" fill="white" stroke="#ddd" strokeWidth="1.5"/>
-      <circle cx="40" cy="80" r="3" fill="#f0f0f0"/>
-      <circle cx="60" cy="80" r="3" fill="#f0f0f0"/>
-    </svg>
-  ),
-  'sport-blue': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#eef4ff"/>
-      <ellipse cx="32" cy="58" rx="10" ry="12" fill="#1a6fd4"/>
-      <path d="M32 46 C32 36 22 30 20 25" stroke="#1a6fd4" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <path d="M20 25 C18 20 24 17 26 22" stroke="#1a6fd4" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <ellipse cx="68" cy="58" rx="10" ry="12" fill="#1a6fd4"/>
-      <path d="M68 46 C68 36 78 30 80 25" stroke="#1a6fd4" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <path d="M80 25 C82 20 76 17 74 22" stroke="#1a6fd4" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      <circle cx="32" cy="58" r="5" fill="#0d4fa8"/>
-      <circle cx="68" cy="58" r="5" fill="#0d4fa8"/>
-      <path d="M42 65 Q50 72 58 65" stroke="#1a6fd4" strokeWidth="2" fill="none" strokeLinecap="round"/>
-    </svg>
-  ),
-  'studio-gray': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#f5f5f5"/>
-      <path d="M20 56 C20 26 80 26 80 56" stroke="#555" strokeWidth="7" fill="none" strokeLinecap="round"/>
-      <rect x="10" y="50" width="20" height="28" rx="10" fill="#666"/>
-      <rect x="70" y="50" width="20" height="28" rx="10" fill="#666"/>
-      <rect x="13" y="53" width="14" height="22" rx="7" fill="#888"/>
-      <rect x="73" y="53" width="14" height="22" rx="7" fill="#888"/>
-      <line x1="10" y1="56" x2="10" y2="76" stroke="#444" strokeWidth="2"/>
-      <line x1="90" y1="56" x2="90" y2="76" stroke="#444" strokeWidth="2"/>
-    </svg>
-  ),
-  'kids-red': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#fff5f5"/>
-      <path d="M22 52 C22 30 78 30 78 52" stroke="#e53935" strokeWidth="6" fill="none" strokeLinecap="round"/>
-      <rect x="12" y="48" width="18" height="22" rx="9" fill="#e53935"/>
-      <rect x="70" y="48" width="18" height="22" rx="9" fill="#e53935"/>
-      <rect x="15" y="51" width="12" height="16" rx="6" fill="#ef9a9a"/>
-      <rect x="73" y="51" width="12" height="16" rx="6" fill="#ef9a9a"/>
-      <circle cx="21" cy="59" r="4" fill="#ffcdd2"/>
-      <circle cx="79" cy="59" r="4" fill="#ffcdd2"/>
-      <path d="M42 72 Q50 78 58 72" stroke="#e53935" strokeWidth="2" fill="none" strokeLinecap="round"/>
-    </svg>
-  ),
-  'gaming-rgb': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#0d0d1a"/>
-      <path d="M20 52 C20 28 80 28 80 52" stroke="#222" strokeWidth="8" fill="none" strokeLinecap="round"/>
-      <path d="M20 52 C20 28 80 28 80 52" stroke="#9c27b0" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.8"/>
-      <rect x="10" y="48" width="20" height="26" rx="5" fill="#1a1a2e"/>
-      <rect x="70" y="48" width="20" height="26" rx="5" fill="#1a1a2e"/>
-      <rect x="12" y="50" width="16" height="22" rx="4" fill="#9c27b0" opacity="0.4"/>
-      <rect x="72" y="50" width="16" height="22" rx="4" fill="#9c27b0" opacity="0.4"/>
-      <line x1="10" y1="68" x2="2" y2="82" stroke="#333" strokeWidth="3" strokeLinecap="round"/>
-      <rect x="0" y="80" width="8" height="10" rx="2" fill="#444"/>
-      <circle cx="16" cy="61" r="5" fill="#e040fb"/>
-      <circle cx="74" cy="61" r="5" fill="#e040fb"/>
-    </svg>
-  ),
-  'open-back': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#fafafa"/>
-      <path d="M22 54 C22 28 78 28 78 54" stroke="#8d6e63" strokeWidth="5" fill="none" strokeLinecap="round"/>
-      <circle cx="21" cy="62" r="14" fill="#8d6e63" stroke="#6d4c41" strokeWidth="1.5"/>
-      <circle cx="79" cy="62" r="14" fill="#8d6e63" stroke="#6d4c41" strokeWidth="1.5"/>
-      <circle cx="21" cy="62" r="11" fill="none" stroke="#a1887f" strokeWidth="1" strokeDasharray="3,2"/>
-      <circle cx="79" cy="62" r="11" fill="none" stroke="#a1887f" strokeWidth="1" strokeDasharray="3,2"/>
-      <circle cx="21" cy="62" r="5" fill="#6d4c41"/>
-      <circle cx="79" cy="62" r="5" fill="#6d4c41"/>
-    </svg>
-  ),
-  'neckband-gold': (
-    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-      <rect width="100" height="100" fill="#fffdf0"/>
-      <path d="M18 35 C18 65 82 65 82 35" stroke="#c9a84c" strokeWidth="5" fill="none" strokeLinecap="round"/>
-      <ellipse cx="18" cy="33" rx="8" ry="11" fill="#c9a84c"/>
-      <ellipse cx="82" cy="33" rx="8" ry="11" fill="#c9a84c"/>
-      <ellipse cx="18" cy="33" rx="5" ry="7" fill="#ffd700"/>
-      <ellipse cx="82" cy="33" rx="5" ry="7" fill="#ffd700"/>
-      <circle cx="18" cy="33" r="2" fill="#b8860b"/>
-      <circle cx="82" cy="33" r="2" fill="#b8860b"/>
-      <line x1="50" y1="65" x2="50" y2="72" stroke="#c9a84c" strokeWidth="3" strokeLinecap="round"/>
-      <rect x="44" y="70" width="12" height="7" rx="3" fill="#c9a84c"/>
-    </svg>
-  ),
-};
 
-function ProductImage({ imageType, size = 44 }) {
-  return (
-    <div style={{ width: size, height: size, borderRadius: 4, overflow: 'hidden', flexShrink: 0, border: '1px solid #e8e8e8', background: '#f8f8f8' }}>
-      {PRODUCT_IMAGES[imageType] || PRODUCT_IMAGES['over-ear-black']}
-    </div>
-  );
-}
 
-// Generic SD image-ad mockup used by the Creative preview panel. Purely decorative — uses
-// whichever products have been added (or a placeholder box if none yet) plus a monogram
-// standing in for the advertiser's logo, since we don't have a real uploaded logo asset.
-function SdAdMockup({ layout, hasButton, brandName, products, headlineOn, headlineText }) {
-  const wide = layout === 'wide' || layout === 'banner';
-  const p1 = products[0], p2 = products[1];
-  return (
-    <div style={{ background: 'white', width: '100%', height: '100%', display: 'flex', flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : 'stretch', gap: 8, padding: 10, boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-        <div style={{ width: 26, height: 26, borderRadius: 4, background: '#232f3e', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {(brandName || 'AD').slice(0, 2).toUpperCase()}
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {p1 ? <ProductImage imageType={p1.imageType} size={30} /> : <div style={{ width: 30, height: 30, borderRadius: 4, background: '#eee' }} />}
-          {p2 && <ProductImage imageType={p2.imageType} size={30} />}
-        </div>
-      </div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
-        <div style={{ fontSize: 11, color: '#0073bb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {headlineOn && headlineText ? headlineText : `${brandName || 'Your Brand'} — Shop now on Amazon`}
-        </div>
-        {hasButton && (
-          <span style={{ alignSelf: 'flex-start', background: 'var(--amazon-orange)', borderRadius: 14, padding: '3px 12px', fontSize: 11, fontWeight: 600, color: '#111' }}>Shop now</span>
-        )}
-      </div>
-    </div>
-  );
-}
 
-// Generic SD video-ad mockup: a muted autoplay placeholder on one side, brand/logo on the other.
-function SdVideoMockup({ brandName, headlineOn, headlineText, logoOn }) {
-  return (
-    <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-      <div style={{ flex: 1.3, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Play size={20} color="white" fill="white" />
-        </div>
-      </div>
-      <div style={{ flex: 1, background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 8 }}>
-        <div style={{ fontSize: 12, textAlign: 'center', color: '#0073bb' }}>{headlineOn && headlineText ? headlineText : `${brandName || 'Your Brand'}…`}</div>
-        {logoOn && (
-          <div style={{ width: 30, height: 30, borderRadius: 4, background: '#232f3e', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {(brandName || 'AD').slice(0, 2).toUpperCase()}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+const STAR_PATH = 'M8 1.2l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 12l-4.2 2.2.8-4.7L1.2 6.2l4.7-.7z';
+
+/** Console rating stars: 16px orange, outlined when empty, half-filled for .5 ratings. */
+const SB_THEME_GROUPS = [
+  { key: 'brand', label: 'Keywords related to your brand', matchType: 'Theme', bid: '29.75', suggBid: 29.75, min: 21.89, max: 45.64 },
+  { key: 'landing', label: 'Keywords related to your landing pages', matchType: 'Theme', bid: '29.75', suggBid: 29.75, min: 21.89, max: 45.64 },
+];
 
 function Stars({ rating }) {
   return (
-    <span className="ccs-stars">
-      {[1,2,3,4,5].map(i => (
-        <span key={i} style={{ color: i <= Math.round(rating) ? '#e47911' : '#ccc', fontSize: 12 }}>★</span>
-      ))}
+    <span className="ccs-stars" aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map(i => {
+        const fill = rating >= i ? 1 : rating >= i - 0.5 ? 0.5 : 0;
+        const id = `half-${i}`;
+        return (
+          <svg key={i} width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            {fill === 0.5 && <defs><linearGradient id={id}><stop offset="50%" stopColor="#de7921" /><stop offset="50%" stopColor="transparent" /></linearGradient></defs>}
+            <path d={STAR_PATH} fill={fill === 1 ? '#de7921' : fill === 0.5 ? `url(#${id})` : 'none'} stroke="#de7921" strokeWidth="1" />
+          </svg>
+        );
+      })}
     </span>
   );
 }
@@ -205,15 +78,6 @@ function InfoIcon({ tip }) {
   );
 }
 
-// Deterministic pseudo "suggested bid" for simulated SD targets that don't already carry real
-// sugg/suggMin/suggMax data (dynamic segments, named audience leaves/categories). Hashing the
-// key keeps the value stable across re-renders instead of re-rolling on every render.
-function sdPseudoSugg(key) {
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  const sugg = 20 + (hash % 7000) / 100; // ₹20.00 – ₹90.00
-  return { sugg, suggMin: sugg * 0.58, suggMax: sugg * 1.55 };
-}
 
 const TIP_IS_IR = (
   <div>
@@ -315,51 +179,6 @@ function CatRow({ cat, depth, expandedCats, setExpandedCats, addedProdTargets, a
   );
 }
 
-// Lightweight expandable row for the SD audience taxonomy (In-market / Interest & lifestyle
-// "Browse" tree). Unlike CatRow this has no bid/refine columns — it's a plain expand/collapse
-// category with addable named leaf segments, matching the real console's audience browser.
-function AudCatRow({ cat, expandedAudCats, setExpandedAudCats, addedKeys, onAdd, audSearch }) {
-  const hasChildren = cat.items && cat.items.length > 0;
-  const isExpanded = !!expandedAudCats[cat.id] || !!audSearch;
-  const isAdded = addedKeys.has(cat.id);
-  const visible = !audSearch || cat.name.toLowerCase().includes(audSearch.toLowerCase()) ||
-    (hasChildren && cat.items.some(it => it.name.toLowerCase().includes(audSearch.toLowerCase())));
-  if (!visible) return null;
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-        {/* The category itself is a targetable interest (e.g. "Music & Radio") — the chevron
-            only expands to reveal more specific sub-segments underneath it. */}
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: hasChildren ? 'pointer' : 'default', flex: 1, minWidth: 0 }}
-          onClick={() => hasChildren && setExpandedAudCats(e => ({ ...e, [cat.id]: !e[cat.id] }))}
-        >
-          {hasChildren ? (isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />) : <span style={{ width: 13, display: 'inline-block' }} />}
-          <span style={{ fontSize: 13 }}>{cat.name}</span>
-        </div>
-        {isAdded
-          ? <span className="ccs-kw-added-text">Added</span>
-          : <button className="link-btn ccs-kw-add-link" onClick={() => onAdd(cat)}>Add</button>
-        }
-      </div>
-      {isExpanded && hasChildren && cat.items
-        .filter(item => !audSearch || item.name.toLowerCase().includes(audSearch.toLowerCase()) || cat.name.toLowerCase().includes(audSearch.toLowerCase()))
-        .map(item => {
-          const isAdded = addedKeys.has(item.id);
-          return (
-            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px 10px 34px', borderBottom: '1px solid #f0f0f0' }}>
-              <span style={{ fontSize: 13 }}>{item.name} <InfoIcon tip={item.desc || `Reach shoppers whose activity suggests an interest in ${item.name.replace(/^(IM|LS) - /, '')}.`} /></span>
-              {isAdded
-                ? <span className="ccs-kw-added-text">Added</span>
-                : <button className="link-btn ccs-kw-add-link" onClick={() => onAdd(item)}>Add</button>
-              }
-            </div>
-          );
-        })}
-    </div>
-  );
-}
 
 export default function CreateCampaignSetup() {
   const { type, campaignId: paramCampaignId } = useParams();
@@ -368,17 +187,18 @@ export default function CreateCampaignSetup() {
   const addAdGroup = useStore(s => s.addAdGroup);
   const addKeywords = useStore(s => s.addKeywords);
   const addNegativeKeywords = useStore(s => s.addNegativeKeywords);
+  const addNegativeProducts = useStore(s => s.addNegativeProducts);
   const allProducts = useStore(s => s.products);
   const campaigns = useStore(s => s.campaigns);
 
   const adGroupMode = !!paramCampaignId;
   const parentCampaign = adGroupMode ? campaigns.find(c => c.id === paramCampaignId) : null;
   const campaignType = adGroupMode ? (parentCampaign?.type || 'Sponsored Products') : (TYPE_MAP[type] || 'Sponsored Products');
-  const today = new Date().toISOString().split('T')[0];
+  const today = localISODate();
   const todayDisplay = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' }).replace(',','');
 
   // ── Ad Group ──
-  const [adGroupName, setAdGroupName] = useState(`Ad Group - ${todayDisplay}`);
+  const [adGroupName, setAdGroupName] = useState(() => `Ad Group - ${consoleTimestamp()}`);
 
   // ── Products ──
   const [productTab, setProductTab] = useState('search'); // search | list | upload
@@ -469,10 +289,11 @@ export default function CreateCampaignSetup() {
   const [autoBidMode, setAutoBidMode] = useState('default'); // default | groups
   const [defaultBid, setDefaultBid] = useState('3.00');
   const [autoGroups, setAutoGroups] = useState([
-    { key: 'close',       label: 'Close match',  on: true, bid: '3.00', sugg: 50.10, suggMin: 45.09, suggMax: 55.11 },
-    { key: 'loose',       label: 'Loose match',  on: true, bid: '3.00', sugg: 33.80, suggMin: 25.35, suggMax: 41.37 },
-    { key: 'substitutes', label: 'Substitutes',  on: true, bid: '3.00', sugg: 50.10, suggMin: 40.70, suggMax: 55.11 },
-    { key: 'complements', label: 'Complements',  on: true, bid: '3.00', sugg: 23.52, suggMin: 17.64, suggMax: 29.40 },
+    // Suggested bids as observed on advertising.amazon.in (Oct 2026).
+    { key: 'close',       label: 'Close match',  on: true, bid: '', sugg: 6.72,  suggMin: 3.61,  suggMax: 8.42 },
+    { key: 'loose',       label: 'Loose match',  on: true, bid: '', sugg: 22.18, suggMin: 16.63, suggMax: 27.73 },
+    { key: 'substitutes', label: 'Substitutes',  on: true, bid: '', sugg: 15.39, suggMin: 11.54, suggMax: 19.24 },
+    { key: 'complements', label: 'Complements',  on: true, bid: '', sugg: 33.25, suggMin: 24.94, suggMax: 41.56 },
   ]);
   const updateGroup = (key, field, val) =>
     setAutoGroups(g => g.map(x => x.key === key ? { ...x, [field]: val } : x));
@@ -486,7 +307,7 @@ export default function CreateCampaignSetup() {
   const [kwFilters, setKwFilters] = useState({ broad: true, phrase: true, exact: true });
   const [kwDragOver, setKwDragOver] = useState(false);
   const [kwBidMode, setKwBidMode] = useState('suggested'); // suggested | custom | default
-  const [kwCustomBid, setKwCustomBid] = useState('50.10');
+  const [kwCustomBid, setKwCustomBid] = useState('3.00');
   const [kwBidWarn, setKwBidWarn] = useState(false);
   const [kwBidDropOpen, setKwBidDropOpen] = useState(false);
   const [addedKws, setAddedKws] = useState([]);
@@ -511,55 +332,40 @@ export default function CreateCampaignSetup() {
     { value: 'new-year',         label: 'New Year (30 Dec 2026 - 2 Jan 2027)' },
   ];
 
-  const KW_GROUP = { type: 'group', name: 'Keywords related to your product category', suggBid: 22.06, suggMin: 16.45, suggMax: 27.57, bid: '22.06' };
-  const SUGGESTED_KWS = [
-    { kw: 'wireless headphones',         is: 0,       ir: 0,
-      broad:  { sugg: 12.37, min: 8.12,  max: 15.46 },
-      phrase: { sugg: 9.64,  min: 6.34,  max: 12.05 },
-      exact:  { sugg: 10.12, min: 7.59,  max: 13.73 } },
-    { kw: 'bluetooth headphones',        is: '0.03%', ir: 13,
-      broad:  { sugg: 13.79, min: 10.04, max: 17.24 },
-      phrase: { sugg: 10.91, min: 7.90,  max: 13.64 },
-      exact:  { sugg: 17.75, min: 9.13,  max: 22.19 } },
-    { kw: 'noise cancelling headphones', is: 0,       ir: 0,
-      broad:  { sugg: 7.13,  min: 3.91,  max: 8.91  },
-      phrase: { sugg: 5.56,  min: 3.04,  max: 6.95  },
-      exact:  { sugg: 5.99,  min: 3.46,  max: 7.31  } },
-    { kw: 'over ear headphones',         is: 0,       ir: 0,
-      broad:  { sugg: 4.59,  min: 2.87,  max: 5.74  },
-      phrase: { sugg: 4.02,  min: 2.52,  max: 5.03  },
-      exact:  { sugg: 3.06,  min: 1.91,  max: 3.83  } },
-    { kw: 'earbuds wireless',            is: 0,       ir: 0,
-      broad:  { sugg: 3.61,  min: 2.26,  max: 4.52  },
-      phrase: { sugg: 4.88,  min: 3.05,  max: 6.10  },
-      exact:  { sugg: 3.78,  min: 2.36,  max: 4.73  } },
-    { kw: 'gaming headset',              is: 0,       ir: 0,
-      broad:  { sugg: 7.96,  min: 4.98,  max: 9.96  },
-      phrase: { sugg: 3.06,  min: 1.91,  max: 3.83  },
-      exact:  { sugg: 3.56,  min: 2.23,  max: 4.45  } },
-    { kw: 'sports earbuds',              is: 0,       ir: 0,
-      broad:  { sugg: 7.14,  min: 4.46,  max: 8.93  },
-      phrase: { sugg: 5.22,  min: 3.26,  max: 6.53  },
-      exact:  { sugg: 6.45,  min: 4.03,  max: 8.07  } },
-    { kw: 'true wireless earbuds',       is: 0,       ir: 0,
-      broad:  { sugg: 8.92,  min: 5.58,  max: 11.15 },
-      phrase: { sugg: 6.75,  min: 4.22,  max: 8.44  },
-      exact:  { sugg: 9.23,  min: 5.77,  max: 11.54 } },
-    { kw: 'headphones with mic',         is: 0,       ir: 0,
-      broad:  { sugg: 5.44,  min: 3.40,  max: 6.80  },
-      phrase: { sugg: 4.18,  min: 2.61,  max: 5.23  },
-      exact:  { sugg: 6.02,  min: 3.76,  max: 7.53  } },
-    { kw: 'bass headphones',             is: 0,       ir: 0,
-      broad:  { sugg: 3.87,  min: 2.42,  max: 4.84  },
-      phrase: { sugg: 2.94,  min: 1.84,  max: 3.68  },
-      exact:  { sugg: 4.11,  min: 2.57,  max: 5.14  } },
-  ];
+  const AUTO_DEFAULT_SUGG = { sugg: 33.25, min: 24.94, max: 41.56 };
+  const AUTO_DEFAULT_START_BID = '3.00';
+  const AUTO_GROUP_START_BID = '3.00';
+  const KW_GROUP = { type: 'group', name: 'Keywords related to your product category', suggBid: 8.03, suggMin: 5.20, suggMax: 10.04, bid: '' };
 
   const kwEffBid = (kwData) => kwBidMode === 'suggested'
     ? kwData.sugg.toFixed(2)
     : kwCustomBid; // both 'custom' and 'default' use the bid input value
 
   const kwGroupAdded = !!addedKws.find(k => k.type === 'group');
+  const kwListHasErrors = addedKws.some(k => !validBid(k.bid));
+  // Adding the first product loads suggestions: targeting-group bids fill with ₹3.00 and an
+  // untouched default bid takes the suggested value (observed on advertising.amazon.in).
+  const hasProducts = addedProducts.length > 0;
+  useEffect(() => {
+    if (!hasProducts) return;
+    setAutoGroups(g => g.map(x => (x.bid === '' ? { ...x, bid: AUTO_GROUP_START_BID } : x)));
+    setDefaultBid(b => (b === AUTO_DEFAULT_START_BID ? AUTO_DEFAULT_SUGG.sugg.toFixed(2) : b));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasProducts]);
+  // Choosing manual keyword targeting pre-adds the keyword group with no bid (the console flags "Enter a bid").
+  const [kwGroupDismissed, setKwGroupDismissed] = useState(false);
+  const isManualKeyword = (adGroupMode ? parentCampaign?.targetingType : targetingType) === 'Manual' && manualTargetType === 'keyword';
+  useEffect(() => {
+    if (campaignType !== 'Sponsored Products' || !isManualKeyword || kwGroupDismissed) return;
+    // With products added the console pre-fills the group's suggested bid; with none it is left empty.
+    const groupBid = addedProducts.length > 0 && kwBidMode === 'suggested' ? KW_GROUP.suggBid.toFixed(2) : '';
+    setAddedKws(prev => {
+      const group = prev.find(k => k.type === 'group');
+      if (!group) return [{ ...KW_GROUP, bid: groupBid }, ...prev];
+      return group.bid === '' && groupBid ? prev.map(k => (k.type === 'group' ? { ...k, bid: groupBid } : k)) : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManualKeyword, kwGroupDismissed, addedProducts.length]);
   const addKwGroup = () => {
     if (!kwGroupAdded) {
       const bid = kwBidMode === 'suggested' ? KW_GROUP.suggBid.toFixed(2) : kwCustomBid;
@@ -587,58 +393,6 @@ export default function CreateCampaignSetup() {
       });
     });
     setAddedKws(prev => [...prev, ...toAdd]);
-  };
-  // SB-specific add helpers — use sbKwBidMode + VCPM multiplier
-  const sbKwEffBid = (kwData) => {
-    const M = sbGoal === 'impression-share' ? 29.43 : 1;
-    return sbKwBidMode === 'suggested'
-      ? (kwData.sugg * M).toFixed(2)
-      : sbKwBid;
-  };
-  const sbAddKwFromSugg = (kw, matchType, kwData) => {
-    if (!addedKws.find(k => k.type !== 'group' && k.keyword === kw && k.matchType === matchType)) {
-      setAddedKws(prev => [...prev, {
-        type: 'kw', keyword: kw, matchType,
-        suggBid: kwData.sugg, suggMin: kwData.min, suggMax: kwData.max,
-        bid: sbKwEffBid(kwData), isDefaultBid: sbKwBidMode === 'default',
-      }]);
-    }
-  };
-  const sbAddAllSuggKws = () => {
-    const toAdd = [];
-    SUGGESTED_KWS.forEach(s => {
-      ['broad', 'phrase', 'exact'].filter(m => kwFilters[m]).forEach(m => {
-        const mt = m.charAt(0).toUpperCase() + m.slice(1);
-        if (!addedKws.find(k => k.type !== 'group' && k.keyword === s.kw && k.matchType === mt)) {
-          const kd = s[m];
-          toAdd.push({ type: 'kw', keyword: s.kw, matchType: mt, suggBid: kd.sugg, suggMin: kd.min, suggMax: kd.max, bid: sbKwEffBid(kd), isDefaultBid: sbKwBidMode === 'default' });
-        }
-      });
-    });
-    setAddedKws(prev => [...prev, ...toAdd]);
-  };
-  const sbAddKwsFromText = () => {
-    const lines = kwText.split('\n').map(l => l.trim()).filter(Boolean);
-    const matchTypes = Object.entries(kwFilters).filter(([, v]) => v).map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
-    const M = sbGoal === 'impression-share' ? 29.43 : 1;
-    const toAdd = [];
-    const errors = [];
-    lines.forEach(kw => {
-      matchTypes.forEach(mt => {
-        if (addedKws.find(k => k.type !== 'group' && k.keyword === kw && k.matchType === mt)) {
-          errors.push({ input: kw, type: mt, error: `"${kw}" (${mt}) is already added` });
-        } else {
-          // For suggested: random CPC in ₹7–₹20 range, scaled by VCPM multiplier
-          const randCpc = parseFloat((7 + (kw.length % 13)).toFixed(2)); // deterministic per keyword length so same kw always gets same bid
-          const bid = sbKwBidMode === 'suggested' ? (randCpc * M).toFixed(2) : sbKwBid;
-          const suggBid = sbKwBidMode === 'suggested' ? randCpc : null;
-          toAdd.push({ type: 'kw', keyword: kw, matchType: mt, suggBid, bid, isDefaultBid: false });
-        }
-      });
-    });
-    setAddedKws(prev => [...prev, ...toAdd]);
-    setKwEnterListErrors(errors);
-    setKwText('');
   };
 
   const addKwsFromText = () => {
@@ -695,7 +449,6 @@ export default function CreateCampaignSetup() {
   const [ptCatTab, setPtCatTab] = useState('suggested');
   const [catSearch, setCatSearch] = useState('');
   const [expandedCats, setExpandedCats] = useState({});
-  const [expandedAudCats, setExpandedAudCats] = useState({});
   const [refineTarget, setRefineTarget] = useState(null);
   const [refineBrand, setRefineBrand] = useState([]);
   const [refineBrandSearch, setRefineBrandSearch] = useState('');
@@ -707,7 +460,8 @@ export default function CreateCampaignSetup() {
   const [refineShipping, setRefineShipping] = useState('all');
   const [ptIndivSubTab, setPtIndivSubTab] = useState('suggested');
   const [ptIndivSearch, setPtIndivSearch] = useState('');
-  const [ptIndivFilterExact, setPtIndivFilterExact] = useState(true);
+  // Console default: Expanded only.
+  const [ptIndivFilterExact, setPtIndivFilterExact] = useState(false);
   const [ptIndivFilterExpanded, setPtIndivFilterExpanded] = useState(true);
   const [ptIndivEnterList, setPtIndivEnterList] = useState('');
   const [ptIndivDragOver, setPtIndivDragOver] = useState(false);
@@ -719,9 +473,12 @@ export default function CreateCampaignSetup() {
   const [ptBidDropOpen, setPtBidDropOpen] = useState(false);
 
   // ── Campaign settings (declared here so effectiveBiddingStrategy can reference biddingStrategy) ──
-  const [campaignName, setCampaignName] = useState('');
+  const nameStamp = useMemo(() => consoleTimestamp(), []);
+  const defaultCampaignName = (setup) => `${setup === 'preset' ? 'Preset campaign' : 'Campaign'} - ${nameStamp}`;
+  const [campaignName, setCampaignName] = useState(() => defaultCampaignName('standard'));
   const [portfolioId, setPortfolioId] = useState('');
-  const [budget, setBudget] = useState(() => campaignType === 'Sponsored Display' ? '1000' : '500');
+  // Console defaults: Display pre-fills ₹1,000; Sponsored Products and Brands start empty.
+  const [budget, setBudget] = useState(() => (campaignType === 'Sponsored Display' ? '1000' : ''));
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState('');
   const [biddingStrategy, setBiddingStrategy] = useState('Dynamic bids - up and down');
@@ -745,6 +502,43 @@ export default function CreateCampaignSetup() {
   const [placementPages, setPlacementPages] = useState('0');
   const [placementTab, setPlacementTab] = useState('placements'); // placements | audiences
   const [bizCheck, setBizCheck] = useState(false);
+  // ── SP: setup, sites, audiences, forecast (see pages/builder/sp) ──
+  const [spSetup, setSpSetup] = useState('standard'); // standard | preset
+  const [searchParams] = useSearchParams();
+  const [spSite, setSpSite] = useState(() => parentCampaign?.site || (searchParams.get('site') === SITE_AMAZON_BUSINESS ? SITE_AMAZON_BUSINESS : 'amazon-and-beyond'));
+  const [audienceAdj, setAudienceAdj] = useState({ mode: 'none', audience: '', pct: '0' });
+  const [spNegKws, setSpNegKws] = useState([]);
+  const [spNegProds, setSpNegProds] = useState([]);
+  const [forecastPeriod, setForecastPeriod] = useState('Weekly');
+  const [extraCountry, setExtraCountry] = useState(false);
+  const isPreset = !adGroupMode && campaignType === 'Sponsored Products' && spSetup === 'preset';
+  const isBusinessSite = spSite === SITE_AMAZON_BUSINESS;
+  // Placement adjustments: editable when creating a campaign, inherited (read-only) for a new ad group.
+  const inherited = parentCampaign?.placementAdjustments || {};
+  const effectivePlacements = [
+    { key: 'top', label: 'Top of search (first page)', val: adGroupMode ? String(inherited.top || 0) : placementTop, set: setPlacementTop },
+    { key: 'rest', label: 'Rest of search', val: adGroupMode ? String(inherited.rest || 0) : placementRest, set: setPlacementRest },
+    { key: 'product', label: 'Product pages', val: adGroupMode ? String(inherited.product || 0) : placementPages, set: setPlacementPages },
+  ];
+  const activePlacementCount = effectivePlacements.filter(pl => parseFloat(pl.val) > 0).length;
+  const forecast = spForecast({
+    products: addedProducts.length,
+    targeting: isPreset ? 'Auto' : targetingType,
+    manualType: manualTargetType,
+    keywords: addedKws.map(k => ({ bid: k.bid, suggMin: k.suggMin, suggMax: k.suggMax })),
+    bid: targetingType === 'Auto' ? parseFloat(defaultBid) : (addedKws.reduce((sum, k) => sum + (parseFloat(k.bid) || 0), 0) / Math.max(1, addedKws.length)),
+    budget,
+    period: forecastPeriod,
+  });
+  const exampleBid = 3;
+  const startAt = (pct) => `₹${(exampleBid * (1 + (parseFloat(pct) || 0) / 100)).toFixed(2)}`;
+  const placementExample = `A ₹${exampleBid.toFixed(2)} bid will start at ${startAt(effectivePlacements[0].val)} for top of search, ${startAt(effectivePlacements[1].val)} for rest of search, and ${startAt(effectivePlacements[2].val)} for product pages.${effectiveBiddingStrategy === 'Dynamic bids - up and down' ? ' Dynamic bidding may increase your bids by up to 100% on all placements.' : ''}`;
+  const changeSpSetup = (next) => {
+    setSpSetup(next);
+    // The console renames an untouched default name when you switch setup type.
+    // Switching back to Standard keeps the "Preset campaign" name, as the console does.
+    if (next === 'preset') setCampaignName(n => (n === defaultCampaignName('standard') ? defaultCampaignName('preset') : n));
+  };
   const [rulesOpen, setRulesOpen] = useState(true);
   const [rulesBannerDismissed, setRulesBannerDismissed] = useState(false);
   const [bidScheduleChecked, setBidScheduleChecked] = useState(true);
@@ -769,7 +563,7 @@ export default function CreateCampaignSetup() {
   const [sbLogoDropOpen, setSbLogoDropOpen] = useState(false);
   const [sbLogoUrl, setSbLogoUrl] = useState({ type: 'asset', bg: '#6c2eb9', lines: [{ t: 'SOUND', c: 'white' }, { t: 'MAX', c: '#febd69' }] });
   const [sbCreativeAssetsOpen, setSbCreativeAssetsOpen] = useState(false);
-  const [sbAdTitle, setSbAdTitle] = useState('standard');
+  const [sbAdTitle, setSbAdTitle] = useState('auto');
   const [sbStandardTitle, setSbStandardTitle] = useState('Browse the collection');
   const [sbStandardTitleOpen, setSbStandardTitleOpen] = useState(false);
   const [sbAdTitleText, setSbAdTitleText] = useState('');
@@ -780,16 +574,10 @@ export default function CreateCampaignSetup() {
   const [sbExclTab, setSbExclTab] = useState('enter-list');
   const [sbExclText, setSbExclText] = useState('');
   const [sbExcludedAsins, setSbExcludedAsins] = useState([]);
-  const [sbKwTab, setSbKwTab] = useState('suggested');
-  const [sbKwBid, setSbKwBid] = useState('4.00');
-  const [sbKwBidWarn, setSbKwBidWarn] = useState(false);
-  const [sbKwBidMode, setSbKwBidMode] = useState('suggested');
-  const [sbKwBidDropOpen, setSbKwBidDropOpen] = useState(false);
   const [sbTargetType, setSbTargetType] = useState('keyword');
-  const [sbAddedTargetGroups, setSbAddedTargetGroups] = useState([
-    { key: 'brand', label: 'Keywords related to your brand', matchType: 'Theme', bid: '29.75', suggBid: 29.75, min: 21.89, max: 45.64 },
-    { key: 'landing', label: 'Keywords related to your landing pages', matchType: 'Theme', bid: '29.75', suggBid: 29.75, min: 21.89, max: 45.64 },
-  ]);
+  // Theme groups are pre-added only once a manual collection has its 3 products (as in the console).
+  const [sbAddedTargetGroups, setSbAddedTargetGroups] = useState([]);
+  const [sbSite, setSbSite] = useState('amazon');
   const [sbBidAdjTab, setSbBidAdjTab] = useState('placements');
   const [sbTopOfSearch, setSbTopOfSearch] = useState('0');
   const [sbRestOfSearch, setSbRestOfSearch] = useState('0');
@@ -845,160 +633,84 @@ export default function CreateCampaignSetup() {
   const [sbVidPDPPage, setSbVidPDPPage] = useState(1);
 
   // ── SD form ──
-  const [sdAdGroupName, setSdAdGroupName] = useState(`Ad group - ${todayDisplay}`);
-  const [sdGoal, setSdGoal] = useState('consideration'); // reach | consideration | conversion
-  const [sdTargetView, setSdTargetView] = useState(null); // null (category list) | contextual | remarketing | in-market | interest-lifestyle
-  const [sdTargetSearch, setSdTargetSearch] = useState('');
-  const [sdTargetFilterOpen, setSdTargetFilterOpen] = useState(false);
-  const [sdCostControlEnabled, setSdCostControlEnabled] = useState(true);
-  const [sdCostControlValue, setSdCostControlValue] = useState('4.00');
   // Default dynamic-segment suggestions Amazon auto-populates before any product is chosen
-  const [sdAddedAudiences, setSdAddedAudiences] = useState([
-    { key: 'ctx-similar', type: 'Contextual', label: 'Similar to advertised products', desc: 'Shows your ad on pages and products that are contextually similar to the products you are advertising, without relying on shopper browsing or purchase history.', bid: sdPseudoSugg('ctx-similar').sugg.toFixed(2), ...sdPseudoSugg('ctx-similar') },
-    { key: 'views-similar', type: 'Views remarketing', label: 'Similar to advertised products', desc: 'Reach shoppers who viewed products similar to the ones you are advertising within the lookback window.', bid: sdPseudoSugg('views-similar').sugg.toFixed(2), ...sdPseudoSugg('views-similar'), lookbackType: 'views', lookbackDays: 30 },
-    { key: 'views-advertised', type: 'Views remarketing', label: 'Advertised products', desc: 'Reach shoppers who viewed the exact products you are advertising within the lookback window.', bid: sdPseudoSugg('views-advertised').sugg.toFixed(2), ...sdPseudoSugg('views-advertised'), lookbackType: 'views', lookbackDays: 30 },
-    { key: 'purchases-related', type: 'Purchases remarketing', label: 'Related to advertised products', desc: 'Reach shoppers who purchased products related or complementary to the ones you are advertising within the lookback window.', bid: sdPseudoSugg('purchases-related').sugg.toFixed(2), ...sdPseudoSugg('purchases-related'), lookbackType: 'purchases', lookbackDays: 30 },
-    { key: 'purchases-advertised', type: 'Purchases remarketing', label: 'Advertised products', desc: 'Reach shoppers who already purchased the exact products you are advertising within the lookback window — useful for replenishment or cross-sell.', bid: sdPseudoSugg('purchases-advertised').sugg.toFixed(2), ...sdPseudoSugg('purchases-advertised'), lookbackType: 'purchases', lookbackDays: 30 },
-  ]);
-  const [sdAdFormat, setSdAdFormat] = useState('image'); // image | video
   // ── SD targeting drill-down UI state ──
-  const [sdCtxTab, setSdCtxTab] = useState('categories'); // categories | individual
-  const [sdCtxCatSubTab, setSdCtxCatSubTab] = useState('suggested'); // suggested | browse
-  const [sdCtxIndivSubTab, setSdCtxIndivSubTab] = useState('suggested'); // suggested | search | enter-list
-  const [sdIndivSearch, setSdIndivSearch] = useState('');
-  const [sdIndivEnterList, setSdIndivEnterList] = useState('');
-  const [sdAudSubTab, setSdAudSubTab] = useState('suggested'); // suggested | browse
-  const [sdLookbackType, setSdLookbackType] = useState('views'); // views | purchases
-  const [sdLookbackDays, setSdLookbackDays] = useState(30);
-  const [sdLookbackTypeDropOpen, setSdLookbackTypeDropOpen] = useState(false);
-  const [sdLookbackDaysDropOpen, setSdLookbackDaysDropOpen] = useState(false);
-  const [sdItemLookbackOpen, setSdItemLookbackOpen] = useState(null);
   // Bid mode for the drill-down's "Bid" selector — governs what bid gets assigned to newly
   // added targets. Locked to 'suggested' (with an explanatory tooltip) whenever Cost control
   // is on, since Amazon manages bids automatically in that mode.
-  const [sdBidMode, setSdBidMode] = useState('suggested'); // suggested | custom
-  const [sdCustomBid, setSdCustomBid] = useState('3.00');
-  const [sdBidModeDropOpen, setSdBidModeDropOpen] = useState(false);
-  const [sdBidLockTooltipOpen, setSdBidLockTooltipOpen] = useState(false);
   // ── SD Creative state ──
-  const [sdCrLogo, setSdCrLogo] = useState(true);
-  const [sdCrHeadline, setSdCrHeadline] = useState(false);
-  const [sdCrHeadlineText, setSdCrHeadlineText] = useState('');
-  const [sdCrImage, setSdCrImage] = useState(false);
-  const [sdCrVideoFile, setSdCrVideoFile] = useState(null);
-  const [sdCrDrill, setSdCrDrill] = useState(null); // null | 'logo' | 'headline' | 'image' | 'video'
-  const [sdCrPreviewIdx, setSdCrPreviewIdx] = useState(0);
-  const [sdCrPreviewDropOpen, setSdCrPreviewDropOpen] = useState(false);
 
   // ── Launch ──
+  const [launchErrors, setLaunchErrors] = useState([]);
+  const spDraft = () => ({
+    mode: adGroupMode ? 'adGroup' : 'campaign',
+    setup: isPreset ? 'preset' : 'standard',
+    name: campaignName,
+    adGroupName,
+    budget,
+    startDate,
+    endDate,
+    portfolioId,
+    biddingStrategy,
+    targetingType: effectiveTargetingType,
+    manualType: manualTargetType,
+    autoBidMode,
+    defaultBid,
+    autoGroups,
+    keywords: addedKws,
+    productTargets: addedProdTargets,
+    negativeKeywords: spNegKws,
+    negativeProducts: spNegProds,
+    products: addedProducts.map(p => p.asin),
+    site: spSite,
+    placements: { top: placementTop, rest: placementRest, product: placementPages },
+    audience: audienceAdj,
+  });
+
   const handleLaunch = () => {
-    if (adGroupMode) {
-      // Adding an ad group to an existing campaign
-      if (addedProducts.length === 0) return alert('Please add at least one product.');
-      const agId = `ag${Date.now()}`;
-      addAdGroup({ id: agId, campaignId: paramCampaignId, name: adGroupName, status: 'Enabled', defaultBid: parseFloat(defaultBid), metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } });
-      if (effectiveTargetingType === 'Manual' && addedKws.length > 0) {
-        addKeywords(addedKws.filter(k => k.type !== 'group').map(k => ({
-          adGroupId: agId, campaignId: paramCampaignId, keyword: k.keyword,
-          matchType: k.matchType, bid: parseFloat(k.bid), status: 'Enabled',
-          metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 },
-        })));
-      }
-      if (addedNegKws.length > 0) {
-        addNegativeKeywords(addedNegKws.map(nk => ({ ...nk, adGroupId: agId, campaignId: paramCampaignId })));
-      }
-      navigate(`/campaigns/${paramCampaignId}`);
+    const draft = spDraft();
+    const errors = validateSpDraft(draft);
+    setLaunchErrors(errors);
+    if (errors.length) {
+      document.querySelector('.ccs-main')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
-
-    if (!campaignName) return alert('Please enter a campaign name.');
-    if (addedProducts.length === 0) return alert('Please add at least one product.');
-
-    const campaignId = `c${Date.now()}`;
-    addCampaign({
-      id: campaignId,
-      name: campaignName,
-      type: campaignType,
-      status: 'Enabled',
-      targetingType,
-      budget: parseFloat(budget),
-      budgetType: 'Daily',
-      biddingStrategy,
-      portfolioId,
-      startDate,
-      endDate,
-      createdAt: today,
-      metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 },
-    });
-
-    const agId = `ag${Date.now()}`;
-    addAdGroup({ id: agId, campaignId, name: adGroupName, status: 'Enabled', defaultBid: parseFloat(defaultBid), metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } });
-
-    if (effectiveTargetingType === 'Manual' && addedKws.length > 0) {
-      addKeywords(addedKws.filter(k => k.type !== 'group').map(k => ({
-        adGroupId: agId, campaignId, keyword: k.keyword,
-        matchType: k.matchType, bid: parseFloat(k.bid), status: 'Enabled',
-        metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 },
-      })));
-    }
-
-    navigate(`/campaigns/${campaignId}`);
+    const stamp = Date.now();
+    const campaignId = adGroupMode ? paramCampaignId : `c${stamp}`;
+    const out = buildSpLaunch(draft, { campaignId, adGroupId: `ag${stamp}`, today, parentCampaign });
+    if (out.campaign) addCampaign(out.campaign);
+    addAdGroup(out.adGroup);
+    if (out.keywords.length) addKeywords(out.keywords);
+    if (out.negativeKeywords.length) addNegativeKeywords(out.negativeKeywords);
+    if (out.negativeProducts.length) addNegativeProducts(out.negativeProducts);
+    navigate(campaignPath(out.campaign || parentCampaign));
   };
 
   const handleLaunchSB = () => {
-    if (!campaignName.trim()) return alert('Please enter a campaign name.');
-    if (sbProducts.length === 0) return alert('Please select at least 1 product for your creative.');
-    if (!sbHeadline.trim()) return alert('Please enter a headline for your ad.');
-    const campaignId = `c${Date.now()}`;
-    addCampaign({
-      id: campaignId, name: campaignName, type: 'Sponsored Brands', status: 'Enabled',
-      targetingType: 'Manual', budget: parseFloat(budget) || 500, budgetType: sbBudgetType,
-      biddingStrategy: biddingStrategy || 'Fixed bid', portfolioId, startDate, endDate,
-      adFormat: sbAdFormat,
-      sbCreative: { brandName: 'SoundMax', headline: sbHeadline, landingPage: sbLandingPage, products: sbProducts.map(p => p.asin) },
-      createdAt: today,
-      metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 },
-    });
-    const kws = addedKws.filter(k => k.type !== 'group');
-    if (kws.length > 0) {
-      addKeywords(kws.map(k => ({
-        adGroupId: null, campaignId, keyword: k.keyword, matchType: k.matchType,
-        bid: parseFloat(k.bid) || 25, status: 'Enabled',
-        metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 },
-      })));
-    }
-    if (addedNegKws.length > 0) {
-      addNegativeKeywords(addedNegKws.map(nk => ({ ...nk, campaignId, adGroupId: null, level: 'Campaign' })));
-    }
-    navigate(`/campaigns/${campaignId}`);
+    const draft = {
+      name: campaignName, adGroupName, budget, budgetType: sbBudgetType, startDate, endDate, portfolioId,
+      goal: sbGoal, site: sbSite, adFormat: sbAdFormat, collectionType: sbCollectionType, products: sbProducts,
+      titleMode: sbAdTitle, customTitle: sbAdTitleText, brandName: sbBrandName, landingPage: sbLandingPageType,
+      targetType: sbTargetType,
+      keywords: [
+        ...sbAddedTargetGroups.map(g => ({ keyword: g.label, matchType: 'Theme', bid: g.bid })),
+        ...addedKws.filter(k => k.type !== 'group').map(k => ({ keyword: k.keyword, matchType: k.matchType, bid: k.bid })),
+      ],
+      productTargets: addedProdTargets,
+      negativeKeywords: addedNegKws,
+    };
+    const errors = validateSbDraft(draft);
+    setLaunchErrors(errors);
+    if (errors.length) { document.querySelector('.wizard-content')?.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    const out = buildSbLaunch(draft, { campaignId: `c${Date.now()}`, adGroupId: `ag${Date.now()}`, today: localISODate() });
+    addCampaign(out.campaign);
+    addAdGroup(out.adGroup);
+    if (out.keywords.length) addKeywords(out.keywords);
+    if (out.negativeKeywords.length) addNegativeKeywords(out.negativeKeywords);
+    navigate(campaignPath(out.campaign));
   };
 
-  const handleLaunchSD = () => {
-    if (!campaignName.trim()) return alert('Please enter a campaign name.');
-    if (addedProducts.length === 0) return alert('Please add at least 1 product to advertise.');
-    if (addedProdTargets.length === 0 && sdAddedAudiences.length === 0) return alert('Please choose at least one audience.');
-    const hasContextual = addedProdTargets.length > 0;
-    const hasAudiences = sdAddedAudiences.length > 0;
-    const campaignId = `c${Date.now()}`;
-    addCampaign({
-      id: campaignId, name: campaignName, type: 'Sponsored Display', status: 'Enabled',
-      targetingType: hasContextual && hasAudiences ? 'Contextual + Audiences' : hasContextual ? 'Contextual' : 'Audiences',
-      budget: parseFloat(budget) || 20, budgetType: 'Daily',
-      biddingStrategy: sdGoal === 'reach' ? 'Optimize for reach' : sdGoal === 'conversion' ? 'Optimize for conversions' : 'Optimize for page visits',
-      costType: sdGoal === 'reach' ? 'VCPM' : 'CPC',
-      goal: sdGoal, costControlEnabled: sdCostControlEnabled,
-      bid: sdCostControlEnabled ? (parseFloat(sdCostControlValue) || 0) : null,
-      portfolioId, startDate, endDate,
-      sdCreative: { adFormat: sdAdFormat, products: addedProducts.map(p => p.asin) },
-      sdTargets: [
-        ...addedProdTargets.map(t => ({ type: 'Contextual', name: t.name, bid: t.bid })),
-        ...sdAddedAudiences.map(a => ({ type: 'Audience', name: a.label, bid: a.bid })),
-      ],
-      createdAt: today,
-      metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0, ctr: 0, cpc: 0, acos: 0, roas: 0, cvr: 0 },
-    });
-    navigate(`/campaigns/${campaignId}`);
-  };
+
 
   // ── Product targeting data ──
   const SUGGESTED_CATS = [
@@ -1115,6 +827,21 @@ export default function CreateCampaignSetup() {
     }
   }, [sbGoal, sbAdFormat]);
 
+  // Console behaviour: the two theme groups appear (pre-added, bid = suggested) the first time a
+  // manual collection reaches 3 products; an automatic collection has no suggestions at all.
+  const [sbGroupsSeeded, setSbGroupsSeeded] = useState(false);
+  useEffect(() => {
+    if (sbCollectionType !== 'manual') {
+      setSbAddedTargetGroups([]);
+      setSbGroupsSeeded(false);
+      return;
+    }
+    if (!sbGroupsSeeded && sbProducts.length >= SB_MIN_PRODUCTS) {
+      setSbAddedTargetGroups(SB_THEME_GROUPS);
+      setSbGroupsSeeded(true);
+    }
+  }, [sbCollectionType, sbProducts.length, sbGroupsSeeded]);
+
   // Cost control has no effect when the card is hidden (impression-share goal)
   const costControlActive = false;
 
@@ -1122,6 +849,9 @@ export default function CreateCampaignSetup() {
   // SPONSORED BRANDS SCROLL FORM
   // ─────────────────────────────────────────────────────────────────
   if (campaignType === 'Sponsored Brands' && !adGroupMode) {
+    // Manual collections hide the ad, targeting and bid sections until 3 products are added.
+    const sbHasKwSuggestions = sbCollectionType === 'manual' || sbAdFormat === 'store-spotlight' || sbAdFormat === 'video';
+    const sbIsUnlocked = sbAdFormat !== 'product-collection' || sbCollectionType === 'automatic' || sbProducts.length >= SB_MIN_PRODUCTS;
     const sbFiltered = allProducts.filter(p =>
       !sbProductSearch ||
       p.name.toLowerCase().includes(sbProductSearch.toLowerCase()) ||
@@ -1292,7 +1022,7 @@ export default function CreateCampaignSetup() {
             <span className="ccs-topbar-title">New campaign</span>
           </div>
           <div className="ccs-topbar-right">
-            <button className="link-btn ccs-back-link" onClick={() => navigate('/create-campaign')}>
+            <button className="link-btn ccs-back-link" onClick={() => navigate('/cb')}>
               Go back to campaigns
             </button>
             <button className="btn btn-secondary">Save as draft</button>
@@ -1301,16 +1031,23 @@ export default function CreateCampaignSetup() {
         </div>
 
         {/* ── SB Body (no sidebar — full-width scroll like real console) ── */}
-        <div className="ccs-body" style={{ display: 'block', maxWidth: 1200, margin: '0 auto', padding: '32px 40px' }}>
+        <div className="ccs-body sb-body" style={{ display: 'block', maxWidth: 1340, margin: '0 auto', padding: '32px 24px' }}>
+
+          {launchErrors.length > 0 && (
+            <div className="sb-alert" role="alert">
+              <strong>Fix the following to submit your campaign for review:</strong>
+              <ul>{launchErrors.map(e => <li key={e}>{e}</li>)}</ul>
+            </div>
+          )}
 
           {/* ═══ CAMPAIGN SECTION ═══ */}
-          <div className="ccs-section-title" style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>Campaign</div>
+          <div className="ccs-section-title">Campaign</div>
 
           {/* Goals */}
           <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Goals <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> Learn about goals</a>
+              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> Learn about goals</a>
             </div>
             <div className="ccs-card-body">
               <p style={{ fontSize: 13, color: '#555', marginBottom: 16 }}>
@@ -1346,7 +1083,7 @@ export default function CreateCampaignSetup() {
           <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Settings</span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> See campaign settings guidance</a>
+              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> See campaign settings guidance</a>
             </div>
             {sbGoal !== 'share-of-voice' ? (
               <div className="ccs-card-body" style={{ maxWidth: 700 }}>
@@ -1368,18 +1105,12 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-date-row" style={{ marginTop: 14 }}>
                   <div className="ccs-field">
                     <label className="ccs-label">Start <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap">
-                      <span className="ccs-date-icon">📅</span>
-                      <input type="date" className="ccs-date-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    </div>
+                    <DateField value={startDate} onChange={setStartDate} min={today} />
                   </div>
                   <div className="ccs-field">
                     <label className="ccs-label">End <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap">
-                      <span className="ccs-date-icon">📅</span>
-                      <input type="date" className="ccs-date-input" value={endDate} onChange={e => { setEndDate(e.target.value); if (!e.target.value && sbBudgetType === 'Lifetime') setSbBudgetType('Daily'); }} />
-                      {!endDate && <span className="ccs-no-end">No end date</span>}
-                    </div>
+                    <DateField value={endDate} min={startDate} isClearable placeholder="No end date"
+                      onChange={v => { setEndDate(v); if (!v && sbBudgetType === 'Lifetime') setSbBudgetType('Daily'); }} />
                   </div>
                 </div>
                 <div className="ccs-field" style={{ marginTop: 14 }}>
@@ -1456,11 +1187,11 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-date-row" style={{ marginTop: 14 }}>
                   <div className="ccs-field">
                     <label className="ccs-label">Start <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap"><span className="ccs-date-icon">📅</span><input type="date" className="ccs-date-input" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+                    <DateField value={startDate} onChange={setStartDate} min={today} />
                   </div>
                   <div className="ccs-field">
                     <label className="ccs-label">End <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap"><span className="ccs-date-icon">📅</span><input type="date" className="ccs-date-input" value={endDate} onChange={e => setEndDate(e.target.value)} />{!endDate && <span className="ccs-no-end">No end date</span>}</div>
+                    <DateField value={endDate} onChange={setEndDate} min={startDate} isClearable placeholder="No end date" />
                   </div>
                 </div>
                 <div className="ccs-field" style={{ marginTop: 14 }}>
@@ -1569,15 +1300,17 @@ export default function CreateCampaignSetup() {
             })()}
           </div>
 
+          {sbGoal !== 'share-of-voice' && <SbSitesCard value={sbSite} onChange={setSbSite} />}
+
           {/* ═══ AD GROUP AND AD SECTION ═══ */}
           {sbGoal !== 'share-of-voice' && <>
-          <div className="ccs-section-title" style={{ fontSize: 24, fontWeight: 700, marginBottom: 20, marginTop: 32 }}>Ad group and ad</div>
+          <div className="ccs-section-title">Ad group and ad</div>
 
           {/* Ad group */}
           <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Ad group <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to choose an ad format</a>
+              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> How to choose an ad format</a>
             </div>
             <div className="ccs-card-body">
               <div className="ccs-field" style={{ maxWidth: 460, marginBottom: 24 }}>
@@ -1735,7 +1468,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card" style={{ marginBottom: 16, border: sbVidPDPProduct ? '1px solid var(--amazon-border)' : '1px solid #e07b7b' }}>
                 <div className="ccs-card-header">
                   <span className="ccs-card-heading">Products <InfoIcon /></span>
-                  <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to add products to your campaign</a>
+                  <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> How to add products to your campaign</a>
                 </div>
                 <div style={{ fontSize: 13, color: '#555', padding: '0 20px 10px' }}>Choose related products to feature in your ad.</div>
                 <div style={{ display: 'flex', borderTop: '1px solid #f0f0f0' }}>
@@ -1868,14 +1601,19 @@ export default function CreateCampaignSetup() {
               </div>
             </div>
           )}
-          {sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && <div className="ccs-card" style={{ marginBottom: 16 }}>
+          {/* Products — manual collection only; sections below unlock at 3 products */}
+          {sbAdFormat === 'product-collection' && sbCollectionType === 'manual' && (
+            <SbProductsCard catalogue={allProducts} products={sbProducts} onChange={setSbProducts} brand={sbBrandName} />
+          )}
+
+          {sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && sbIsUnlocked && <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="ccs-card-heading">Ad</span>
                 <InfoIcon />
               </div>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> {sbCollectionType === 'manual' ? 'Learn about manual collection ads' : 'Learn about automatic collection ads'}
+                <CircleHelp size={13} /> {sbCollectionType === 'manual' ? 'Learn about manual collection ads' : 'Learn about automatic collection ads'}
               </a>
             </div>
             <div className="ccs-card-body" style={{ maxWidth: 600 }}>
@@ -2096,7 +1834,7 @@ export default function CreateCampaignSetup() {
                     <InfoIcon />
                   </div>
                   <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                    <Info size={12} /> Learn about Store Spotlight ads
+                    <CircleHelp size={13} /> Learn about Store Spotlight ads
                   </a>
                 </div>
                 <div style={{ display: 'flex', borderTop: '1px solid var(--amazon-border)' }}>
@@ -3188,7 +2926,7 @@ export default function CreateCampaignSetup() {
                   <span className="ccs-card-heading">Product exclusions <InfoIcon /></span>
                   <span className="ccs-optional-tag">optional</span>
                 </div>
-                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How product exclusion works</a>
+                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> How product exclusion works</a>
               </button>
               {sbExclOpen && (
                 <div style={{ borderTop: '1px solid var(--amazon-border)', display: 'flex' }}>
@@ -3269,196 +3007,11 @@ export default function CreateCampaignSetup() {
             </div>
           )}
 
-          {/* Products — only for manual collection */}
-          {sbAdFormat === 'product-collection' && sbCollectionType === 'manual' && (
-            <div className="ccs-card" style={{ marginBottom: 16 }}>
-              <div className="ccs-card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="ccs-card-heading">Products</span>
-                  <span style={{ fontSize: 11, padding: '1px 7px', background: '#5c4ee5', color: 'white', borderRadius: 12, fontWeight: 600 }}>New</span>
-                  <InfoIcon />
-                </div>
-                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to add products to your campaign</a>
-              </div>
-              <div style={{ fontSize: 13, color: '#555', padding: '8px 20px 4px' }}>Choose related products to feature in your ad.</div>
-              <div style={{ display: 'flex' }}>
-                {/* Left panel */}
-                <div style={{ flex: 1, borderRight: '1px solid var(--amazon-border)' }}>
-                  {/* Tabs */}
-                  <div style={{ display: 'flex', borderBottom: '1px solid var(--amazon-border)', paddingLeft: 4 }}>
-                    {[['search','Search'],['enter-list','Enter list'],['upload','Upload']].map(([k,l]) => (
-                      <button key={k} onClick={() => setSbProductTab(k)} style={{
-                        padding: '10px 16px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer',
-                        borderBottom: sbProductTab === k ? '2px solid #0073bb' : '2px solid transparent',
-                        color: sbProductTab === k ? '#0073bb' : '#555', fontWeight: sbProductTab === k ? 700 : 400,
-                      }}>{l}</button>
-                    ))}
-                  </div>
-
-                  {sbProductTab === 'search' && (
-                    <div>
-                      <div style={{ padding: '12px 16px', position: 'relative' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <div style={{ flex: 1, position: 'relative' }}>
-                            <div className="ccs-search-wrap">
-                              <Search size={14} className="ccs-search-icon" />
-                              <input className="ccs-search-input" value={sbProductSearch}
-                                onChange={e => { setSbProductSearch(e.target.value); setSbProductAutoComplete(e.target.value.length > 1); }}
-                                onBlur={() => setTimeout(() => setSbProductAutoComplete(false), 150)}
-                                placeholder="Search by product name" />
-                            </div>
-                            {sbProductAutoComplete && sbFiltered.length > 0 && (
-                              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #ddd', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 300, maxHeight: 200, overflowY: 'auto' }}>
-                                {sbFiltered.slice(0, 5).map(p => (
-                                  <div key={p.asin} onMouseDown={() => { setSbProductSearch(p.name); setSbProductAutoComplete(false); }}
-                                    style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer', color: '#333', lineHeight: 1.4 }}
-                                    onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                                    {p.name}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {/* Brand filter pill */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #ccc', borderRadius: 4, padding: '0 10px', fontSize: 13, cursor: 'pointer', background: 'white', whiteSpace: 'nowrap' }}>
-                            SoundMax <ChevronDown size={13} style={{ marginLeft: 4 }} />
-                          </div>
-                        </div>
-                      </div>
-                      {/* Product list */}
-                      <div>
-                        {sbFiltered.map(p => {
-                          const added = !!sbProducts.find(x => x.asin === p.asin);
-                          const atLimit = sbProducts.length >= 10 && !added;
-                          return (
-                            <div key={p.asin} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                              <ProductImage imageType={p.imageType} size={52} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, color: '#0066c0', cursor: 'pointer', lineHeight: 1.4, marginBottom: 4 }}>{p.name}</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555', marginBottom: 3 }}>
-                                  <Stars rating={p.rating} />
-                                  <span>({p.reviews})</span>
-                                  <span>Price may vary by location</span>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.status === 'In stock' ? '#007600' : '#888', display: 'inline-block' }} />
-                                    {p.status || 'In stock'}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: 12, color: '#555' }}>ASIN: {p.asin}</div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  if (added) setSbProducts(prev => prev.filter(x => x.asin !== p.asin));
-                                  else if (!atLimit) setSbProducts(prev => [...prev, p]);
-                                }}
-                                disabled={atLimit && !added}
-                                style={{
-                                  padding: '5px 16px', fontSize: 13, borderRadius: 16,
-                                  border: '1px solid #ccc', background: added ? '#e8f4e8' : atLimit ? '#f5f5f5' : 'white',
-                                  color: added ? '#2d6a2d' : atLimit ? '#aaa' : '#333',
-                                  cursor: atLimit && !added ? 'not-allowed' : 'pointer', flexShrink: 0,
-                                }}>
-                                {added ? 'Added' : 'Add'}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {/* Pagination */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid #f0f0f0', fontSize: 13, color: '#555' }}>
-                        <span>1-{Math.min(sbFiltered.length, 10)} of {sbFiltered.length} results</span>
-                        <button style={{ padding: '4px 8px', border: '1px solid #ccc', borderRadius: 4, background: 'white', cursor: 'pointer' }} disabled>‹</button>
-                        <button style={{ padding: '4px 8px', border: '1px solid #ccc', borderRadius: 4, background: 'white', cursor: 'pointer' }} disabled>›</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {sbProductTab === 'enter-list' && (
-                    <div style={{ padding: '16px' }}>
-                      <div style={{ fontSize: 13, color: '#555', marginBottom: 8 }}>Enter one ASIN per line.</div>
-                      <textarea className="ccs-textarea" rows={8} placeholder="B0XXXXXXXXX"
-                        style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} />
-                      <div style={{ textAlign: 'right', marginTop: 8 }}>
-                        <button className="btn btn-secondary">Add products</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {sbProductTab === 'upload' && (
-                    <div style={{ padding: '20px 20px' }}>
-                      <p style={{ fontSize: 13, color: '#333', marginBottom: 14 }}>Use the template to make sure your information uploads accurately.</p>
-                      <a href="data:text/csv;charset=utf-8,ASIN%0AB0XXXXXXXXX" download="product-template.csv"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', border: '1px solid #ccc', borderRadius: 20, fontSize: 13, color: '#333', textDecoration: 'none', background: '#f5f5f5', marginBottom: 16 }}>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 1v8M7 9l-3-3M7 9l3-3M2 12h10" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        Download the CSV template
-                      </a>
-                      <label style={{ display: 'block', cursor: 'pointer' }}>
-                        <input type="file" accept=".csv,.tsv,.xlsx" style={{ display: 'none' }} onChange={e => {
-                          const file = e.target.files[0]; if (!file) return;
-                          e.target.value = '';
-                        }} />
-                        <div style={{ border: '1.5px dashed #b0b8c9', borderRadius: 8, padding: '48px 20px', textAlign: 'center', background: '#f8f9fb', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M18 26V10M18 10l-7 7M18 10l7 7" stroke="#3d4966" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            <rect x="4" y="28" width="28" height="3" rx="1.5" fill="#3d4966"/>
-                          </svg>
-                          <div style={{ fontSize: 13, color: '#3d4966' }}>Drag and drop file to add</div>
-                          <div style={{ fontSize: 13, color: '#3d4966' }}>or click to select from your computer</div>
-                          <div style={{ fontSize: 12, color: '#7a8299', marginTop: 4 }}>Accepted formats: CSV, TSV, XLSX</div>
-                        </div>
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right panel */}
-                <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--amazon-border)', fontWeight: 700, fontSize: 14 }}>
-                    {sbProducts.length} products
-                  </div>
-                  {sbProducts.length < 3 && (
-                    <div style={{ margin: 12, padding: '12px 14px', background: '#fff5f5', border: '1px solid #e8a0a0', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c40000' }}>
-                      <span style={{ fontSize: 16 }}>!</span>
-                      <span>Add at least three products to advertise</span>
-                    </div>
-                  )}
-                  <div style={{ padding: '8px 16px', fontSize: 13, color: '#555' }}>
-                    Add 3-10 products to feature in your ad.<br />Drag cards to change the display order.
-                  </div>
-                  {sbProducts.length > 0 && (
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px' }}>
-                      {sbProducts.map((p, idx) => (
-                        <div key={p.asin} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid #f0f0f0' }}>
-                          <span style={{ color: '#aaa', fontSize: 14, cursor: 'grab' }}>⠿</span>
-                          <ProductImage imageType={p.imageType} size={36} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                            <div style={{ fontSize: 11, color: '#888' }}>ASIN: {p.asin}</div>
-                          </div>
-                          <button className="ccs-remove-btn" onClick={() => setSbProducts(prev => prev.filter(x => x.asin !== p.asin))}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* Bottom validation */}
-              {sbProducts.length < 3 && (
-                <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#c40000' }}>
-                  <span>!</span> Add at least three products to advertise
-                </div>
-              )}
-            </div>
-          )}
-
           {/* ═══ TARGETING TYPE SELECTOR — manual collection only ═══ */}
           {((sbCollectionType === 'manual' && sbProducts.length >= 3) || (sbAdFormat === 'store-spotlight' && sbSSStore) || sbAdFormat === 'video') && (sbAdFormat !== 'store-spotlight' || sbSSStore) && (sbAdFormat !== 'video' || sbLandingPage !== 'product-detail' || !!sbVidPDPProduct) && !(sbGoal === 'impression-share' && (sbAdFormat === 'video' || sbAdFormat === 'store-spotlight')) && <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header">
               <span style={{ fontSize: 20, fontWeight: 700 }}>Targeting <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> Select your targeting strategy</a>
+              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> Select your targeting strategy</a>
             </div>
             <div className="ccs-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
@@ -3483,359 +3036,18 @@ export default function CreateCampaignSetup() {
           {/* ─── KEYWORD TARGETING CARD ─── */}
           {/* automatic: always show; manual: only when 3+ products and keyword targeting selected */}
           {((sbCollectionType === 'automatic' && sbAdFormat !== 'video' && sbAdFormat !== 'store-spotlight') || (sbCollectionType === 'manual' && sbProducts.length >= 3 && sbTargetType === 'keyword') || (sbAdFormat === 'store-spotlight' && sbSSStore && sbTargetType === 'keyword') || (sbAdFormat === 'video' && sbTargetType === 'keyword')) && (sbAdFormat !== 'store-spotlight' || sbSSStore) && (sbAdFormat !== 'video' || sbLandingPage !== 'product-detail' || !!sbVidPDPProduct) && (
-          <div className="ccs-card" style={{ marginBottom: 16 }}>
-            <div className="ccs-card-header">
-              <span className="ccs-card-heading">Keyword targeting <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> Select keywords to target</a>
-            </div>
-            <div style={{ display: 'flex' }}>
-              {/* Left */}
-              <div style={{ flex: '0 0 50%', minWidth: 0, borderRight: '1px solid var(--amazon-border)' }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--amazon-border)' }}>
-                  {(sbCollectionType === 'manual' || sbAdFormat === 'store-spotlight' || sbAdFormat === 'video'
-                    ? [['suggested','Suggested'],['enter-list','Enter list'],['upload-file','Upload file']]
-                    : [['enter-list','Enter list'],['upload-file','Upload file']]
-                  ).map(([k, l]) => (
-                    <button key={k} onClick={() => setSbKwTab(k)} style={{
-                      padding: '10px 18px', fontSize: 13, border: 'none', background: 'none', cursor: 'pointer',
-                      borderBottom: (sbCollectionType === 'automatic' && sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && sbKwTab === 'suggested' ? 'enter-list' : sbKwTab) === k ? '2px solid #0073bb' : '2px solid transparent',
-                      color: (sbCollectionType === 'automatic' && sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && sbKwTab === 'suggested' ? 'enter-list' : sbKwTab) === k ? '#0073bb' : '#666',
-                      fontWeight: (sbCollectionType === 'automatic' && sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && sbKwTab === 'suggested' ? 'enter-list' : sbKwTab) === k ? 700 : 400,
-                    }}>{l}</button>
-                  ))}
-                </div>
-
-                {/* ── Suggested tab — manual collection / store-spotlight / video ── */}
-                {(sbCollectionType === 'manual' || sbAdFormat === 'store-spotlight' || sbAdFormat === 'video') && sbKwTab === 'suggested' && (
-                  <div>
-                    {/* Fixed: Bid + Filter by */}
-                    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, borderBottom: '1px solid #f0f0f0' }}>
-                      {/* Bid row */}
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 60 }}>Bid <InfoIcon /></span>
-                          <div style={{ position: 'relative' }}
-                            onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setSbKwBidDropOpen(false); }}
-                            tabIndex={-1}>
-                            <div onClick={() => setSbKwBidDropOpen(o => !o)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ccc', borderRadius: 20, padding: '4px 12px 4px 14px', fontSize: 13, cursor: 'pointer', background: '#f5f5f5', userSelect: 'none' }}>
-                              {sbKwBidMode === 'suggested' ? 'Suggested bid' : sbKwBidMode === 'default' ? 'Default bid' : 'Custom bid'}
-                              <ChevronDown size={12} />
-                            </div>
-                            {sbKwBidDropOpen && (
-                              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: 'white', border: '1px solid #ddd', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 300, width: 240, overflow: 'hidden' }}>
-                                {[
-                                  { key: 'suggested', label: 'Suggested bid', desc: 'Based on past bidding activity to predict bids likely to win.' },
-                                  { key: 'custom', label: 'Custom bid', desc: 'Set a custom bid for all newly added keywords.' },
-                                  ...(sbGoal !== 'impression-share' ? [{ key: 'default', label: 'Default bid', desc: 'Use the ad group default bid for all newly added keywords.' }] : []),
-                                ].map(opt => (
-                                  <div key={opt.key} onClick={() => { setSbKwBidMode(opt.key); setSbKwBidDropOpen(false); }}
-                                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{opt.label}</div>
-                                    <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{opt.desc}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {(sbKwBidMode === 'custom' || sbKwBidMode === 'default') && (
-                            <div>
-                              <div className="ccs-bid-input-wrap">
-                                <span className="ccs-bid-prefix">₹</span>
-                                <input type="number" className="ccs-bid-input" value={sbKwBid} min="0"
-                                  onChange={e => { const v = parseFloat(e.target.value); setSbKwBid(v < 0 ? '0' : e.target.value); setSbKwBidWarn(false); }}
-                                  onBlur={e => setSbKwBidWarn(e.target.value !== '' && parseFloat(e.target.value) < 0.01)}
-                                  style={{ width: 70 }} />
-                              </div>
-                              {sbKwBidWarn && <div style={{ fontSize: 11, color: '#c40000', marginTop: 3 }}>Minimum bid is ₹0.01</div>}
-                            </div>
-                          )}
-                          <span style={{ fontSize: 13, color: '#666' }}>
-                            {sbGoal === 'impression-share' ? 'per 1,000 viewable impressions (VCPM)' : 'per click (CPC)'}
-                          </span>
-                        </div>
-                        {sbGoal === 'impression-share' && sbKwBidMode === 'suggested' && (
-                          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ fontSize: 13, color: '#333', lineHeight: 1.5 }}>Suggested VCPM bid is the total amount you would pay, on average, if your ad were viewed at top of search 1,000 times.</div>
-                            <a href="https://advertising.amazon.in/help/GDS2E64R9GQ35768" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#0066c0', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                              <span style={{ width: 15, height: 15, borderRadius: '50%', border: '1.5px solid #0066c0', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>?</span>
-                              Learn more about vCPM bids
-                            </a>
-                          </div>
-                        )}
-                        {sbGoal === 'impression-share' && sbKwBidMode === 'custom' && (
-                          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ fontSize: 13, color: '#333', lineHeight: 1.5 }}>A VCPM bid of at least ₹200.00 can increase your chances of winning views in the top-of-search placement.</div>
-                            <a href="https://advertising.amazon.in/help/GDS2E64R9GQ35768" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#0066c0', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                              <span style={{ width: 15, height: 15, borderRadius: '50%', border: '1.5px solid #0066c0', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>?</span>
-                              Learn more about vCPM bids
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                      {/* Filter by */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, minWidth: 60 }}>Filter by <InfoIcon /></span>
-                        {['broad', 'phrase', 'exact'].map(m => (
-                          <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
-                            <input type="checkbox" checked={kwFilters[m]} onChange={e => setKwFilters(f => ({ ...f, [m]: e.target.checked }))}
-                              style={{ accentColor: '#0073bb', width: 14, height: 14 }} />
-                            {m.charAt(0).toUpperCase() + m.slice(1)}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Scrollable: Targeting groups + keywords */}
-                    <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-                      {/* Targeting groups */}
-                      <div>
-                        {(() => {
-                          const vcpm = sbGoal === 'impression-share';
-                          const M = 29.43;
-                          const tgs = [
-                            { key: 'brand', label: 'Keywords related to your brand', suggBid: 29.75, min: 21.89, max: 45.64 },
-                            { key: 'landing', label: 'Keywords related to your landing pages', suggBid: 29.75, min: 21.89, max: 45.64 },
-                          ].map(g => ({
-                            ...g,
-                            dispSugg: vcpm ? g.suggBid * M : g.suggBid,
-                            dispMin: vcpm ? g.min * M : g.min,
-                            dispMax: vcpm ? g.max * M : g.max,
-                          }));
-                          return (<>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 60px', padding: '8px 16px', fontSize: 12, color: '#555', borderBottom: '1px solid #f0f0f0', fontWeight: 600, background: '#fafafa' }}>
-                          <span>Targeting groups <InfoIcon /></span>
-                          <span>Match type <InfoIcon /></span>
-                          <span>Sugg. bid <InfoIcon /></span>
-                          <button className="link-btn" style={{ fontSize: 12, color: '#0073bb', textAlign: 'right' }}
-                            onClick={() => setSbAddedTargetGroups(tgs.map(g => ({ key: g.key, label: g.label, matchType: 'Theme', bid: g.dispSugg.toFixed(2), suggBid: g.dispSugg, min: g.dispMin, max: g.dispMax })))}>Add All</button>
-                        </div>
-                        {tgs.map(g => {
-                          const isAdded = !!sbAddedTargetGroups.find(x => x.key === g.key);
-                          return (
-                            <div key={g.key} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 60px', padding: '10px 16px', fontSize: 13, borderBottom: '1px solid #f0f0f0', alignItems: 'center' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{g.label} <InfoIcon /></span>
-                              <span style={{ color: '#666' }}>Theme</span>
-                              <span>₹{g.dispSugg.toFixed(2)}</span>
-                              {isAdded
-                                ? <span style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>Added</span>
-                                : <button className="link-btn" style={{ color: '#0073bb', fontSize: 13 }}
-                                    onClick={() => setSbAddedTargetGroups(p => [...p, { key: g.key, label: g.label, matchType: 'Theme', bid: g.dispSugg.toFixed(2), suggBid: g.dispSugg, min: g.dispMin, max: g.dispMax }])}>
-                                    Add
-                                  </button>}
-                            </div>
-                          );
-                        })}
-                          </>);
-                        })()}
-                      </div>
-
-                      {/* Individual keywords */}
-                      <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 60px', padding: '8px 16px', fontSize: 12, color: '#555', borderBottom: '1px solid #f0f0f0', fontWeight: 600, background: '#fafafa' }}>
-                          <span>Keyword</span>
-                          <span>Match type <InfoIcon /></span>
-                          <span>Sugg. bid <InfoIcon /></span>
-                          <button className="link-btn" style={{ fontSize: 12, color: '#0073bb', textAlign: 'right' }} onClick={sbAddAllSuggKws}>Add All</button>
-                        </div>
-                        {SUGGESTED_KWS.map(s => {
-                          const matches = ['broad', 'phrase', 'exact'].filter(m => kwFilters[m]);
-                          return (
-                            <div key={s.kw} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                              <div style={{ padding: '8px 16px 0', fontSize: 13, fontWeight: 500 }}>{s.kw}</div>
-                              {matches.map(m => {
-                                const mt = m.charAt(0).toUpperCase() + m.slice(1);
-                                const kd = s[m];
-                                const isAdded = !!addedKws.find(k => k.type !== 'group' && k.keyword === s.kw && k.matchType === mt);
-                                return (
-                                  <div key={m} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px 60px', padding: '4px 16px', fontSize: 13, alignItems: 'center' }}>
-                                    <span />
-                                    <span className={`match-badge match-${m}`}>{mt}</span>
-                                    <span style={{ fontSize: 13, color: '#333' }}>
-                                      {(() => {
-                                        const M = sbGoal === 'impression-share' ? 29.43 : 1;
-                                        return sbKwBidMode === 'suggested'
-                                          ? `₹${(kd.sugg * M).toFixed(2)}`
-                                          : `₹${(kd.min * M).toFixed(2)} – ₹${(kd.max * M).toFixed(2)}`;
-                                      })()}
-                                    </span>
-                                    {isAdded
-                                      ? <span style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>Added</span>
-                                      : <button className="link-btn" style={{ color: '#0073bb', fontSize: 13 }} onClick={() => sbAddKwFromSugg(s.kw, mt, kd)}>Add</button>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Enter list tab ── */}
-                {/* automatic falls back to enter-list if sbKwTab is somehow 'suggested' (not for video/store-spotlight) */}
-                {(sbKwTab === 'enter-list' || (sbCollectionType === 'automatic' && sbAdFormat !== 'store-spotlight' && sbAdFormat !== 'video' && sbKwTab === 'suggested')) && (
-                  <div style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>Bid <InfoIcon /></span>
-                      <div style={{ position: 'relative' }}
-                        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setSbKwBidDropOpen(false); }}
-                        tabIndex={-1}>
-                        <div onClick={() => setSbKwBidDropOpen(o => !o)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ccc', borderRadius: 20, padding: '4px 12px 4px 14px', fontSize: 13, cursor: 'pointer', background: '#f5f5f5', userSelect: 'none' }}>
-                          {sbKwBidMode === 'custom' ? 'Custom bid' : 'Suggested bid'}
-                          <ChevronDown size={12} />
-                        </div>
-                        {sbKwBidDropOpen && (
-                          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: 'white', border: '1px solid #ddd', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 300, width: 260, overflow: 'hidden' }}>
-                            {[
-                              { key: 'suggested', label: 'Suggested bid', desc: 'Automatically applies a suggested bid based on keyword competitiveness.' },
-                              { key: 'custom', label: 'Custom bid', desc: 'Set a custom bid for all newly added keywords.' },
-                            ].map(opt => (
-                              <div key={opt.key} onClick={() => { setSbKwBidMode(opt.key); setSbKwBidDropOpen(false); }}
-                                style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', background: sbKwBidMode === opt.key ? '#f0f7ff' : 'white' }}
-                                onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
-                                onMouseLeave={e => e.currentTarget.style.background = sbKwBidMode === opt.key ? '#f0f7ff' : 'white'}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{opt.label}</div>
-                                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{opt.desc}</div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {sbKwBidMode === 'custom' && (
-                        <div>
-                          <div className="ccs-bid-input-wrap">
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value={sbKwBid}
-                              onChange={e => { const v = parseFloat(e.target.value); setSbKwBid(v < 0 ? '0' : e.target.value); setSbKwBidWarn(false); }}
-                              onBlur={e => setSbKwBidWarn(e.target.value !== '' && parseFloat(e.target.value) < 0.01)}
-                              min="0" style={{ width: 70 }} />
-                          </div>
-                          {sbKwBidWarn && <div style={{ fontSize: 11, color: '#c40000', marginTop: 3 }}>Minimum bid is ₹0.01</div>}
-                        </div>
-                      )}
-                      <span style={{ fontSize: 13, color: '#555' }}>
-                        {sbGoal === 'impression-share' ? 'per 1,000 viewable impressions (VCPM)' : 'per click (CPC)'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>Match type <InfoIcon /></span>
-                      {['broad', 'phrase', 'exact'].map(m => (
-                        <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
-                          <input type="checkbox" checked={kwFilters[m]} onChange={e => setKwFilters(f => ({ ...f, [m]: e.target.checked }))}
-                            style={{ accentColor: '#0073bb', width: 14, height: 14 }} />
-                          {m.charAt(0).toUpperCase() + m.slice(1)}
-                        </label>
-                      ))}
-                    </div>
-                    <textarea className="ccs-textarea" rows={10} value={kwText}
-                      onChange={e => setKwText(e.target.value)}
-                      placeholder="Enter keywords separated by new line." style={{ width: '100%' }} />
-                    <div style={{ textAlign: 'right', marginTop: 10 }}>
-                      <button className="btn btn-secondary" disabled={!kwText.trim()}
-                        onClick={() => { setKwEnterListErrors([]); sbAddKwsFromText(); }}>Add keywords</button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Upload file tab ── */}
-                {sbKwTab === 'upload-file' && (
-                  <div style={{ padding: '20px 16px' }}>
-                    <p style={{ fontSize: 13, color: '#333', marginBottom: 14 }}>Use the template to make sure your information uploads accurately.</p>
-                    <a href="data:text/csv;charset=utf-8,Keyword%2CMatch%20Type%0Abluetooth%20headphones%2CBroad"
-                      download="keyword-template.csv"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', border: '1px solid #ccc', borderRadius: 20, fontSize: 13, color: '#333', textDecoration: 'none', background: '#f5f5f5', marginBottom: 16 }}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M7 9l-3-3M7 9l3-3M2 12h10" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Download the CSV template
-                    </a>
-                    <label style={{ display: 'block', cursor: 'pointer' }}>
-                      <input type="file" accept=".csv,.tsv,.xlsx" style={{ display: 'none' }} onChange={e => {
-                        const file = e.target.files[0]; if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = ev => { const lines = ev.target.result.split('\n').slice(1).map(l => l.trim()).filter(Boolean); setKwText(lines.join('\n')); setSbKwTab('enter-list'); };
-                        reader.readAsText(file); e.target.value = '';
-                      }} />
-                      <div style={{ border: '1.5px dashed #b0b8c9', borderRadius: 8, padding: '48px 20px', textAlign: 'center', background: '#f8f9fb', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                        <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M18 26V10M18 10l-7 7M18 10l7 7" stroke="#3d4966" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="4" y="28" width="28" height="3" rx="1.5" fill="#3d4966"/></svg>
-                        <div style={{ fontSize: 13, color: '#3d4966' }}>Drag and drop file to add</div>
-                        <div style={{ fontSize: 13, color: '#3d4966' }}>or click to select from your computer</div>
-                        <div style={{ fontSize: 12, color: '#7a8299', marginTop: 4 }}>Accepted formats: CSV, TSV, XLSX</div>
-                      </div>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Right panel */}
-              <div style={{ flex: '0 0 50%', minWidth: 0, display: 'flex', flexDirection: 'column', maxHeight: 520 }}>
-                <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--amazon-border)', flexShrink: 0 }}>
-                  <strong style={{ fontSize: 13 }}>{sbAddedTargetGroups.length + addedKws.length} added</strong>
-                  {(sbAddedTargetGroups.length + addedKws.length) > 0 && (
-                    <button className="link-btn" style={{ fontSize: 12, color: '#0073bb' }} onClick={() => { setAddedKws([]); setSbAddedTargetGroups([]); }}>Remove all</button>
-                  )}
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 58px 80px 115px 20px', padding: '8px 12px', fontSize: 12, color: '#555', borderBottom: '1px solid #f0f0f0', fontWeight: 600, gap: 4, position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-                  <span>Keyword</span><span>Match type <InfoIcon /></span><span>Sugg. bid <InfoIcon /></span><span>Bid <InfoIcon /></span><span />
-                </div>
-                {/* Targeting group rows */}
-                {sbAddedTargetGroups.map(g => {
-                  const vcpmM = sbGoal === 'impression-share' ? 29.43 : 1;
-                  return (
-                  <div key={g.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 58px 80px 115px 20px', padding: '8px 12px', fontSize: 13, borderBottom: '1px solid #f8f8f8', alignItems: 'center', gap: 4 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12, wordBreak: 'break-word' }}>{g.label}</div>
-                      <div style={{ fontSize: 11, color: '#888' }}>Targeting group</div>
-                    </div>
-                    <span style={{ fontSize: 12, color: '#555' }}>{g.matchType}</span>
-                    <div style={{ fontSize: 12 }}>
-                      <div>₹{(g.suggBid * vcpmM).toFixed(2)}</div>
-                      <div style={{ color: '#888', fontSize: 11 }}>₹{(g.min * vcpmM).toFixed(2)}–₹{(g.max * vcpmM).toFixed(2)}</div>
-                    </div>
-                    <div className="ccs-bid-input-wrap" style={{ width: 112, opacity: costControlActive ? 0.5 : 1 }}>
-                      <span className="ccs-bid-prefix">₹</span>
-                      <input type="number" className="ccs-bid-input" value={costControlActive ? '' : g.bid}
-                        placeholder="-"
-                        disabled={costControlActive}
-                        onChange={e => { const v = parseFloat(e.target.value); setSbAddedTargetGroups(p => p.map(x => x.key === g.key ? { ...x, bid: v < 0 ? '0' : e.target.value } : x)); }}
-                        style={{ width: 86, background: costControlActive ? '#f0f0f0' : '', color: costControlActive ? '#999' : '' }} />
-                    </div>
-                    <button className="ccs-remove-btn" onClick={() => setSbAddedTargetGroups(p => p.filter(x => x.key !== g.key))}>×</button>
-                  </div>
-                );})}
-                {/* Regular keyword rows */}
-                {addedKws.length === 0 && sbAddedTargetGroups.length === 0 && (
-                  <div style={{ padding: '20px 16px', fontSize: 13, color: '#aaa' }}>No keywords added yet</div>
-                )}
-                {addedKws.map((k, i) => {
-                  const vcpmM = sbGoal === 'impression-share' ? 29.43 : 1;
-                  return (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 58px 80px 115px 20px', padding: '8px 12px', fontSize: 13, borderBottom: '1px solid #f8f8f8', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 12, wordBreak: 'break-word', minWidth: 0 }}>{k.keyword}</span>
-                    <span>{k.matchType ? <span className={`match-badge match-${k.matchType.toLowerCase()}`}>{k.matchType}</span> : '–'}</span>
-                    <div style={{ fontSize: 12 }}>
-                      {k.suggBid != null ? <div>₹{(k.suggBid * vcpmM).toFixed(2)}{k.min != null && k.max != null && <><br /><span style={{ color: '#888', fontSize: 11 }}>₹{(k.min * vcpmM).toFixed(2)}–₹{(k.max * vcpmM).toFixed(2)}</span></>}</div> : <span style={{ color: '#aaa' }}>–</span>}
-                    </div>
-                    <div className="ccs-bid-input-wrap" style={{ width: 112, opacity: costControlActive ? 0.5 : 1 }}>
-                      <span className="ccs-bid-prefix">₹</span>
-                      <input type="number" className="ccs-bid-input" value={costControlActive ? '' : k.bid}
-                        placeholder="-"
-                        disabled={costControlActive}
-                        onChange={e => { const v = parseFloat(e.target.value); setAddedKws(p => p.map((x, j) => j === i ? { ...x, bid: v < 0 ? '0' : e.target.value } : x)); }}
-                        style={{ width: 86, background: costControlActive ? '#f0f0f0' : '', color: costControlActive ? '#999' : '' }} />
-                    </div>
-                    <button className="ccs-remove-btn" onClick={() => setAddedKws(p => p.filter((_, j) => j !== i))}>×</button>
-                  </div>
-                );})}
-                </div>{/* end scroll wrapper */}
-              </div>
-            </div>
-          </div>
-          )} {/* end sbTargetType === 'keyword' */}
+            <SbKeywordTargeting
+              key={sbHasKwSuggestions ? 'suggested' : 'list-only'}
+              hasSuggestions={sbHasKwSuggestions}
+              isVcpm={sbGoal === 'impression-share'}
+              suggestions={SUGGESTED_KWS}
+              themeGroups={SB_THEME_GROUPS}
+              keywords={addedKws.filter(k => k.type !== 'group')}
+              onKeywords={setAddedKws}
+              groups={sbAddedTargetGroups}
+              onGroups={setSbAddedTargetGroups}
+            />
+          )}
 
           {/* ─── PRODUCT TARGETING CARD — manual collection + product targeting selected ─── */}
           {((sbCollectionType === 'manual' && sbProducts.length >= 3) || (sbAdFormat === 'store-spotlight' && sbSSStore) || sbAdFormat === 'video') && (sbAdFormat !== 'store-spotlight' || sbSSStore) && sbTargetType === 'product' && (sbAdFormat !== 'video' || sbLandingPage !== 'product-detail' || !!sbVidPDPProduct) && !(sbGoal === 'impression-share' && (sbAdFormat === 'video' || sbAdFormat === 'store-spotlight')) && (
@@ -3843,7 +3055,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card-header">
                 <span className="ccs-card-heading">Product Targeting <InfoIcon /></span>
                 <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                  <Info size={12} /> How to use product targeting
+                  <CircleHelp size={13} /> How to use product targeting
                 </a>
               </div>
               <div className="ccs-kw-layout">
@@ -3906,8 +3118,9 @@ export default function CreateCampaignSetup() {
 
                       {ptCatTab === 'suggested' && (
                         (sbAdFormat !== 'video' && sbAdFormat !== 'store-spotlight' && sbProducts.length === 0) ? (
-                          <div style={{ padding: '24px 16px', color: '#888', fontSize: 13, textAlign: 'center' }}>
-                            Add at least one product above to see suggested categories.
+                          <div className="tg-empty">
+                            <strong>No relevant categories available</strong>
+                            <button type="button" className="tg-empty-link" onClick={() => setPtCatTab('search')}>Try searching for categories</button>
                           </div>
                         ) : (
                           <div>
@@ -4030,7 +3243,10 @@ export default function CreateCampaignSetup() {
                       {/* SUGGESTED */}
                       {ptIndivSubTab === 'suggested' && (
                         (sbAdFormat !== 'video' && sbAdFormat !== 'store-spotlight' && sbProducts.length === 0) ? (
-                          <div style={{ padding: '24px 16px', color: '#888', fontSize: 13, textAlign: 'center' }}>Add at least one product above to see suggestions.</div>
+                          <div className="tg-empty">
+                            <strong>No suggestions available.</strong>
+                            <button type="button" className="tg-empty-link" onClick={() => setPtIndivSubTab('search')}>Try searching for products.</button>
+                          </div>
                         ) : (
                           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
                             <div className="ccs-indiv-list-hdr">
@@ -4046,55 +3262,7 @@ export default function CreateCampaignSetup() {
                             </div>
                             <div className="ccs-indiv-list">
                               {INDIV_SUGGESTED.map(p => (
-                                <div key={p.id} className="ccs-indiv-product-block">
-                                  {/* Product info row */}
-                                  <div className="ccs-indiv-product-info">
-                                    <div style={{ width: 56, height: 56, borderRadius: 4, overflow: 'hidden', flexShrink: 0, border: '1px solid #e8e8e8' }}>
-                                      {getIndivImage(p)}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 13, color: '#0073bb', fontWeight: 500, marginBottom: 2, cursor: 'pointer', lineHeight: 1.4 }}>{p.name.length > 80 ? p.name.slice(0, 80) + '…' : p.name}</div>
-                                      <div style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>{p.format}</div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                                        {renderStars(p.stars)}
-                                        <span style={{ fontSize: 12, color: '#0073bb' }}>({p.reviews.toLocaleString('en-IN')})</span>
-                                      </div>
-                                      {p.originalPrice && <div style={{ fontSize: 12 }}><s style={{ color: '#888' }}>₹{p.originalPrice.toLocaleString('en-IN')}</s> <span style={{ color: '#b12704', fontWeight: 600 }}>₹{p.price.toLocaleString('en-IN')}</span></div>}
-                                      <div style={{ fontSize: 12, color: p.status === 'In stock' ? '#007600' : '#c40000', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.status === 'In stock' ? '#007600' : '#c40000', flexShrink: 0, display: 'inline-block' }} />
-                                        {p.status}
-                                      </div>
-                                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>ASIN: {p.asin}</div>
-                                    </div>
-                                  </div>
-                                  {/* Type rows */}
-                                  {ptIndivFilterExact && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span />
-                                      <span style={{ fontSize: 13, color: '#555' }}>{p.sugg ? `₹${p.sugg.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Exact</span>
-                                      <div>
-                                        {addedProdTargets.find(t => t.id === `indiv-${p.id}-exact`)
-                                          ? <span className="ccs-kw-added-text">Added</span>
-                                          : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, prodMin: 1, prodMax: 1, brands: [], bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact' })}>Add</button>
-                                        }
-                                      </div>
-                                    </div>
-                                  )}
-                                  {ptIndivFilterExpanded && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span />
-                                      <span style={{ fontSize: 13, color: '#555' }}>{p.suggExpanded ? `₹${p.suggExpanded.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Expanded</span>
-                                      <div>
-                                        {addedProdTargets.find(t => t.id === `indiv-${p.id}-expanded`)
-                                          ? <span className="ccs-kw-added-text">Added</span>
-                                          : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, prodMin: 1, prodMax: 1, brands: [], bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded' })}>Add</button>
-                                        }
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                <IndivProductRow key={p.id} product={p} image={getIndivImage(p)} types={[ptIndivFilterExact && 'Exact', ptIndivFilterExpanded && 'Expanded'].filter(Boolean)} isAdded={(t) => !!addedProdTargets.find(x => x.id === `indiv-${p.id}-${t.toLowerCase()}`)} onAdd={(t) => addProdTarget(t === 'Exact' ? { id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] } : { id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })} />
                               ))}
                             </div>
                           </div>
@@ -4113,32 +3281,7 @@ export default function CreateCampaignSetup() {
                           {ptIndivSearch && (
                             <div className="ccs-indiv-list">
                               {INDIV_SUGGESTED.filter(p => p.name.toLowerCase().includes(ptIndivSearch.toLowerCase()) || p.asin.toLowerCase().includes(ptIndivSearch.toLowerCase())).map(p => (
-                                <div key={p.id} className="ccs-indiv-product-block">
-                                  <div className="ccs-indiv-product-info">
-                                    <div style={{ width: 56, height: 56, borderRadius: 4, overflow: 'hidden', flexShrink: 0, border: '1px solid #e8e8e8' }}>{getIndivImage(p)}</div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 13, color: '#0073bb', fontWeight: 500, marginBottom: 2, lineHeight: 1.4 }}>{p.name.length > 80 ? p.name.slice(0, 80) + '…' : p.name}</div>
-                                      <div style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>{p.format}</div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>{renderStars(p.stars)}<span style={{ fontSize: 12, color: '#0073bb' }}>({p.reviews.toLocaleString('en-IN')})</span></div>
-                                      <div style={{ fontSize: 12 }}><s style={{ color: '#888' }}>₹{p.originalPrice?.toLocaleString('en-IN')}</s> <span style={{ color: '#b12704', fontWeight: 600 }}>₹{p.price.toLocaleString('en-IN')}</span></div>
-                                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>ASIN: {p.asin}</div>
-                                    </div>
-                                  </div>
-                                  {ptIndivFilterExact && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span /><span style={{ fontSize: 13, color: '#555' }}>{p.sugg ? `₹${p.sugg.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Exact</span>
-                                      <div>{addedProdTargets.find(t => t.id === `indiv-${p.id}-exact`) ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] })}>Add</button>}</div>
-                                    </div>
-                                  )}
-                                  {ptIndivFilterExpanded && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span /><span style={{ fontSize: 13, color: '#555' }}>{p.suggExpanded ? `₹${p.suggExpanded.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Expanded</span>
-                                      <div>{addedProdTargets.find(t => t.id === `indiv-${p.id}-expanded`) ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })}>Add</button>}</div>
-                                    </div>
-                                  )}
-                                </div>
+                                <IndivProductRow key={p.id} product={p} image={getIndivImage(p)} types={[ptIndivFilterExact && 'Exact', ptIndivFilterExpanded && 'Expanded'].filter(Boolean)} isAdded={(t) => !!addedProdTargets.find(x => x.id === `indiv-${p.id}-${t.toLowerCase()}`)} onAdd={(t) => addProdTarget(t === 'Exact' ? { id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] } : { id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })} />
                               ))}
                               {INDIV_SUGGESTED.filter(p => p.name.toLowerCase().includes(ptIndivSearch.toLowerCase()) || p.asin.toLowerCase().includes(ptIndivSearch.toLowerCase())).length === 0 && (
                                 <div style={{ padding: '20px 0', color: '#888', fontSize: 13, textAlign: 'center' }}>No products found for "{ptIndivSearch}".</div>
@@ -4386,7 +3529,7 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-kw-right">
                   <div className="ccs-added-header">
                     <strong>{addedProdTargets.length} added</strong>
-                    {addedProdTargets.length > 0 && <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedProdTargets([])}>Remove all</button>}
+                    <button className="link-btn tg-remove-all" disabled={addedProdTargets.length === 0} onClick={() => setAddedProdTargets([])}>Remove all</button>
                   </div>
                   <div className="ccs-pt-right-head">
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Categories and products</span>
@@ -4394,7 +3537,7 @@ export default function CreateCampaignSetup() {
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Bid</span>
                   </div>
                   {addedProdTargets.length === 0 ? (
-                    <div className="ccs-kw-right-empty">No targets added yet</div>
+                    <div className="ccs-kw-right-empty" />
                   ) : (
                     addedProdTargets.map((t, i) => (
                       <div key={i} className="ccs-pt-right-row">
@@ -4429,7 +3572,7 @@ export default function CreateCampaignSetup() {
                 <span className="ccs-card-heading">Negative keyword targeting <InfoIcon /></span>
                 <span className="ccs-optional-tag">optional</span>
               </div>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to use negative keywords</a>
+              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> How to use negative keywords</a>
             </button>
             {negKwOpen && (
               <div style={{ borderTop: '1px solid var(--amazon-border)', display: 'flex' }}>
@@ -4459,7 +3602,7 @@ export default function CreateCampaignSetup() {
                     <span>Keyword</span><span>Match type</span>
                   </div>
                   {addedNegKws.length === 0
-                    ? <div style={{ padding: '20px 16px', fontSize: 13, color: '#aaa' }}>No keywords added yet</div>
+                    ? <div className="ccs-kw-right-empty" />
                     : addedNegKws.map((k, i) => (
                         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', padding: '8px 16px', fontSize: 13, borderBottom: '1px solid #f8f8f8', alignItems: 'center', gap: 8 }}>
                           <span>{k.keyword}</span>
@@ -4484,7 +3627,7 @@ export default function CreateCampaignSetup() {
                 <span className="ccs-optional-tag">optional</span>
               </div>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to choose negative products for targeting
+                <CircleHelp size={13} /> How to choose negative products for targeting
               </a>
             </button>
             {negProdOpen && (
@@ -4551,11 +3694,11 @@ export default function CreateCampaignSetup() {
           )} {/* end product neg */}
 
           {/* ═══ CAMPAIGN BID ADJUSTMENTS ═══ */}
-          <div className="ccs-card" style={{ marginBottom: 16 }}>
+          {sbIsUnlocked && <div className="ccs-card" style={{ marginBottom: 16 }}>
             <div className="ccs-card-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                 <span style={{ fontSize: 18, fontWeight: 700 }}>Campaign Bid Adjustments</span>
-                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> Learn about bid adjustments</a>
+                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><CircleHelp size={13} /> Learn about bid adjustments</a>
               </div>
               <p style={{ fontSize: 13, color: '#555', margin: 0 }}>By raising your bids, you will be more likely to appear in specific placements and in front of specific audiences.</p>
             </div>
@@ -4662,7 +3805,7 @@ export default function CreateCampaignSetup() {
                 })()}
               </div>
             </div>
-          </div>
+          </div>}
 
 
           </>}{/* end non-SOV ad group section */}
@@ -4745,7 +3888,6 @@ export default function CreateCampaignSetup() {
                     if (sbLandingPage === 'product-detail') { setSbLandingPage('store'); setSbVidPDPProduct(null); }
                     if (sbTargetType === 'product') setSbTargetType('keyword');
                   }
-                  if (sbKwBidMode === 'default') setSbKwBidMode('suggested');
                 }
                 setSbGoalPending(null);
                 setSbGoalModalOpen(false);
@@ -4762,1330 +3904,10 @@ export default function CreateCampaignSetup() {
   // ─────────────────────────────────────────────────────────────────
   // SPONSORED DISPLAY SCROLL FORM
   // ─────────────────────────────────────────────────────────────────
-  if (campaignType === 'Sponsored Display' && !adGroupMode) {
-    const SD_TARGET_CATEGORIES = [
-      { key: 'contextual', label: 'Contextual', desc: 'Reach audiences who are browsing products and content matching criteria you choose.' },
-      { key: 'remarketing', label: 'Remarketing audiences', desc: 'Reach relevant audiences who have viewed, purchased, or are browsing products and content matching criteria you choose.' },
-      { key: 'in-market', label: 'In-market audiences', desc: 'Reach audiences whose recent activity suggests they are likely to buy products in a certain category.' },
-      { key: 'interest-lifestyle', label: 'Interest and lifestyle audiences', desc: 'Reach audiences whose shopping and entertainment activity suggests certain interest or lifestyle preferences.' },
-    ];
+  if (campaignType === 'Sponsored Display' && !adGroupMode) return <SdBuilder />;
 
-    const SD_AUDIENCES = [
-      { key: 'views-remarketing', group: 'remarketing', label: 'Views remarketing', desc: 'Reach shoppers who viewed your product or similar products in the last 30 days.' },
-      { key: 'purchases-remarketing', group: 'remarketing', label: 'Purchases remarketing', desc: 'Reach shoppers who purchased your product or complementary products.' },
-    ];
-
-    // Short type label shown in the right-hand "added" panel for tree-based audiences.
-    const SD_GROUP_SHORT_LABEL = { 'in-market': 'In-market', 'interest-lifestyle': 'Interest & lifestyle' };
-
-    // Real console audience taxonomy for In-market / Interest & lifestyle "Browse" — a
-    // collapsible category tree. Most categories are just names to browse (matches the real
-    // console, which lists dozens of categories most advertisers never expand); a handful
-    // relevant to our headphones/electronics catalog carry real addable leaf segments, and
-    // those same leaves double as the product-gated "Suggested" list once a product is added.
-    const SD_AUDIENCE_TREE = {
-      'in-market': [
-        { id: 'im-arts-crafts', name: 'Arts & Crafts', items: [] },
-        { id: 'im-baby-products', name: 'Baby Products', items: [] },
-        { id: 'im-beauty-personal-care', name: 'Beauty & Personal Care', items: [] },
-        { id: 'im-books-magazines', name: 'Books & Magazines', items: [] },
-        { id: 'im-business-industrial', name: 'Business & Industrial', items: [] },
-        { id: 'im-electronics', name: 'Electronics', items: [
-          { id: 'im-headphones-earbuds', name: 'IM - Headphones & Earbuds', desc: 'Shoppers whose recent browsing and search activity suggests they are actively in-market for headphones or earbuds.' },
-          { id: 'im-bluetooth-speakers', name: 'IM - Bluetooth Speakers', desc: 'Shoppers actively researching or comparing Bluetooth speakers.' },
-          { id: 'im-tw-earbuds', name: 'IM - True Wireless Earbuds', desc: 'Shoppers actively researching true wireless earbuds specifically.' },
-          { id: 'im-smart-watches', name: 'IM - Smart Watches', desc: 'Shoppers actively researching smart watches or fitness wearables.' },
-          { id: 'im-home-audio', name: 'IM - Home Audio Systems', desc: 'Shoppers actively researching home audio or theatre systems.' },
-        ] },
-        { id: 'im-entertainment', name: 'Entertainment', items: [] },
-        { id: 'im-fashion', name: 'Fashion', items: [] },
-        { id: 'im-gift-cards', name: 'Gift Cards', items: [] },
-        { id: 'im-home-garden', name: 'Home & Garden', items: [] },
-        { id: 'im-kitchen-dining', name: 'Kitchen & Dining', items: [] },
-        { id: 'im-luggage-bags', name: 'Luggage & Travel Gear', items: [] },
-        { id: 'im-office-products', name: 'Office Products', items: [] },
-        { id: 'im-outdoor-recreation', name: 'Outdoor Recreation', items: [] },
-        { id: 'im-pet-supplies', name: 'Pet Supplies', items: [] },
-        { id: 'im-sports-fitness', name: 'Sports & Fitness', items: [] },
-        { id: 'im-toys-games', name: 'Toys & Games', items: [] },
-      ],
-      'interest-lifestyle': [
-        { id: 'ls-games', name: 'Games', items: [] },
-        { id: 'ls-movies-tv', name: 'Movies & TV', items: [] },
-        { id: 'ls-music-radio', name: 'Music & Radio', items: [
-          { id: 'ls-audiophiles', name: 'LS - Audiophiles & Music Enthusiasts', desc: 'Shoppers with an established, ongoing interest in music gear and high-fidelity audio.' },
-          { id: 'ls-music-streaming', name: 'LS - Music Streaming Subscribers', desc: 'Shoppers who actively use music streaming services.' },
-          { id: 'ls-podcast-listeners', name: 'LS - Podcast Listeners', desc: 'Shoppers with an established interest in podcasts and spoken-word audio.' },
-        ] },
-        { id: 'ls-automotive-ownership', name: 'Automotive Ownership', items: [] },
-        { id: 'ls-beauty-grooming', name: 'Beauty & Grooming', items: [] },
-        { id: 'ls-business-careers', name: 'Business & Careers', items: [] },
-        { id: 'ls-business-industry', name: 'Business & Industry', items: [] },
-        { id: 'ls-conscious-consumption', name: 'Conscious Consumption', items: [] },
-        { id: 'ls-entertainment', name: 'Entertainment', items: [
-          { id: 'ls-tech-enthusiasts', name: 'LS - Tech Enthusiasts', desc: 'Shoppers with an established, ongoing interest in technology and consumer electronics.' },
-          { id: 'ls-gadget-lovers', name: 'LS - Gadget Early Adopters', desc: 'Shoppers who tend to purchase and try new gadgets soon after launch.' },
-        ] },
-        { id: 'ls-family', name: 'Family', items: [] },
-        { id: 'ls-health-wellness', name: 'Health & Wellness', items: [] },
-        { id: 'ls-home-garden', name: 'Home & Garden', items: [] },
-        { id: 'ls-new-to-category', name: 'New to Category', items: [] },
-        { id: 'ls-pet-ownership', name: 'Pet Ownership', items: [] },
-        { id: 'ls-pets-animals', name: 'Pets & Animals', items: [] },
-        { id: 'ls-shoppers', name: 'Shoppers', items: [] },
-      ],
-    };
-
-    // Once a product is added, "Suggested" surfaces the leaves from whichever categories are
-    // relevant to what's being advertised (here: our headphones/electronics catalog).
-    const getSdProductAudiences = (group) => {
-      const tree = SD_AUDIENCE_TREE[group] || [];
-      return tree.flatMap(cat => cat.items);
-    };
-
-    // Recommended "dynamic segment" suggestions per targeting group — these are behavior-based
-    // signals (not tied to a real product category), so Amazon surfaces them as suggestions
-    // even before any product has been added. Real, browsable category/audience lists (below)
-    // require at least one product before they return results.
-    const SD_DYNAMIC_SEGMENTS = {
-      contextual: [
-        { key: 'ctx-similar', type: 'Contextual', label: 'Similar to advertised products', desc: 'Shows your ad on pages and products that are contextually similar to the products you are advertising, without relying on shopper browsing or purchase history.' },
-      ],
-      remarketing: [
-        { key: 'views-similar', type: 'Views remarketing', label: 'Similar to advertised products', lookbackType: 'views', desc: 'Reach shoppers who viewed products similar to the ones you are advertising within the lookback window.' },
-        { key: 'views-advertised', type: 'Views remarketing', label: 'Advertised products', lookbackType: 'views', desc: 'Reach shoppers who viewed the exact products you are advertising within the lookback window.' },
-        { key: 'purchases-related', type: 'Purchases remarketing', label: 'Related to advertised products', lookbackType: 'purchases', desc: 'Reach shoppers who purchased products related or complementary to the ones you are advertising within the lookback window.' },
-        { key: 'purchases-advertised', type: 'Purchases remarketing', label: 'Advertised products', lookbackType: 'purchases', desc: 'Reach shoppers who already purchased the exact products you are advertising within the lookback window — useful for replenishment or cross-sell.' },
-      ],
-      'in-market': [],
-      'interest-lifestyle': [],
-    };
-
-    // Bid actually assigned to a newly-added target, given the current Bid-mode selector:
-    // Cost control on → no manual bid (Amazon optimises it); Suggested → the target's own
-    // suggested bid; Custom → whatever the advertiser typed into the Custom bid box.
-    const sdEffBidFor = (suggValue) => {
-      if (sdCostControlEnabled) return '';
-      if (sdBidMode === 'custom') return sdCustomBid;
-      return suggValue ? suggValue.toFixed(2) : sdCustomBid;
-    };
-
-    const addSdAudience = (aud, lookbackDaysOverride) => {
-      if (sdAddedAudiences.find(a => a.key === aud.key)) return;
-      const lookbackDays = aud.lookbackType ? (lookbackDaysOverride || sdLookbackDays) : undefined;
-      const { sugg, suggMin, suggMax } = sdPseudoSugg(aud.key);
-      setSdAddedAudiences(prev => [...prev, {
-        key: aud.key,
-        type: aud.type || SD_TARGET_CATEGORIES.find(c => c.key === aud.group)?.label,
-        label: aud.label,
-        desc: aud.desc,
-        bid: sdEffBidFor(sugg),
-        sugg, suggMin, suggMax,
-        lookbackType: aud.lookbackType,
-        lookbackDays,
-      }]);
-    };
-    const removeSdAudience = (key) => setSdAddedAudiences(prev => prev.filter(a => a.key !== key));
-    const sdTargetTotal = addedProdTargets.length + sdAddedAudiences.length;
-
-    // Individual-product targets added from SD's own Search / Enter list sub-tabs. Uses the
-    // same Bid-mode logic as addSdAudience rather than the shared addProdTarget helper, whose
-    // bid fallback is specific to the SP product-targeting flow.
-    const addSdProdTarget = (item) => {
-      if (addedProdTargets.find(t => t.id === item.id)) return;
-      setAddedProdTargets(prev => [...prev, { ...item, bid: sdEffBidFor(item.sugg) }]);
-    };
-
-    const SD_GOALS = [
-      { key: 'reach', label: 'Reach', desc: 'We will optimise your bids for higher viewable impressions. Drive brand or product awareness by showing your ad to relevant audiences to maximise reach.', costLine: 'Cost type: Cost per 1,000 viewable impressions (VCPM) | Conversion attributed to viewable impressions and clicks', ccLabel: 'Cost per 1,000 viewable impressions', ccDefault: '20.00', ccDuration: '72 hours', ccHelper: v => `A value of ₹${v} or higher may lead to more viewable impressions.`, forecastMetrics: ['Impressions', 'Viewable impressions'], costType: 'VCPM' },
-      { key: 'consideration', label: 'Page visits', desc: 'We will optimize your bids for higher page visits. Drive brand or product consideration by showing your ads to customers more likely to click.', costLine: 'Cost type: Cost per click (CPC) | Conversion attributed to clicks', ccLabel: 'Cost per click', ccDefault: '4.00', ccDuration: '72 hours', ccHelper: v => `A value of ₹${v} or higher may lead to more page visits.`, forecastMetrics: ['Impressions', 'Clicks'], costType: 'CPC' },
-      { key: 'conversion', label: 'Conversions', desc: 'We will optimise your bids for higher conversion rates. Drive sales by showing your ad to shoppers more likely to purchase your product.', costLine: 'Cost type: Cost per click (CPC) | Conversion attributed to clicks', ccLabel: 'Cost per order', ccDefault: '130.00', ccDuration: '14 days', ccHelper: () => 'A higher value may lead to more conversions. But we recommend not entering a value higher than the price of the products you want to advertise. Minimum cost per order is ₹50.00.', forecastMetrics: ['Clicks', 'Orders'], costType: 'CPC' },
-    ];
-    const sdGoalCfg = SD_GOALS.find(g => g.key === sdGoal);
-
-    const todayDisplayMs = `${todayDisplay}.${String(new Date().getMilliseconds()).padStart(3, '0')}`;
-    const formatBudget = (val) => Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    const sdMissing = [];
-    if (!budget || parseFloat(budget) <= 0) sdMissing.push('Enter a budget');
-    if (addedProducts.length === 0) sdMissing.push('Choose products');
-    if (sdTargetTotal === 0) sdMissing.push('Add targets');
-    if (sdCostControlEnabled && (!sdCostControlValue || parseFloat(sdCostControlValue) <= 0)) sdMissing.push('Enter a bid');
-
-    return (
-      <div className="ccs-root">
-        {/* ── SD Topbar ── */}
-        <div className="ccs-topbar">
-          <div className="ccs-topbar-left">
-            <button className="ccs-topbar-close" onClick={() => navigate('/')}><X size={16} /></button>
-            <span className="ccs-topbar-title">New campaign</span>
-          </div>
-          <div className="ccs-topbar-right">
-            <button className="link-btn ccs-back-link" onClick={() => navigate('/create-campaign')}>
-              Go back to campaigns
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/create-campaign')}>Save as draft</button>
-            <button className="btn btn-dark" onClick={handleLaunchSD}>Launch campaign</button>
-          </div>
-        </div>
-
-        {/* ── SD Body (two-column, ad-group model, matches SP shell) ── */}
-        <div className="ccs-body">
-          <div className="ccs-main">
-
-            <div className="ccs-section-title" style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Create campaign</div>
-
-            {/* Settings */}
-            <div className="ccs-card">
-              <div className="ccs-card-header">
-                <span className="ccs-card-heading">Settings</span>
-                <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to set up your campaign</a>
-              </div>
-              <div className="ccs-card-body">
-                <div className="ccs-field" style={{ maxWidth: 460 }}>
-                  <label className="ccs-label">Campaign name <InfoIcon /></label>
-                  <input className="ccs-input-full" value={campaignName} onChange={e => setCampaignName(e.target.value)} placeholder={`Campaign - ${todayDisplayMs}`} />
-                </div>
-                <div className="ccs-field" style={{ maxWidth: 460, marginTop: 14 }}>
-                  <label className="ccs-label">Portfolio <InfoIcon /></label>
-                  <div className="ccs-select-wrap">
-                    <select className="ccs-input-full" value={portfolioId} onChange={e => setPortfolioId(e.target.value)}>
-                      <option value="">No Portfolio</option>
-                      <option value="p1">Main Products Portfolio</option>
-                      <option value="p2">Competitor Targeting Portfolio</option>
-                    </select>
-                    <ChevronDown size={14} className="ccs-select-chevron" />
-                  </div>
-                </div>
-                <div className="ccs-date-row" style={{ marginTop: 14 }}>
-                  <div className="ccs-field">
-                    <label className="ccs-label">Start <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap">
-                      <span className="ccs-date-icon">📅</span>
-                      <input type="date" className="ccs-date-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="ccs-field">
-                    <label className="ccs-label">End <InfoIcon /></label>
-                    <div className="ccs-date-input-wrap">
-                      <span className="ccs-date-icon">📅</span>
-                      <input type="date" className="ccs-date-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                      {!endDate && <span className="ccs-no-end">No end date</span>}
-                    </div>
-                  </div>
-                </div>
-                <div className="ccs-field" style={{ marginTop: 14 }}>
-                  <label className="ccs-label">Country</label>
-                  <div className="ccs-country-static">India</div>
-                </div>
-                <div className="ccs-field" style={{ marginTop: 14, maxWidth: 200 }}>
-                  <label className="ccs-label">Daily budget <InfoIcon /></label>
-                  <div className="ccs-bid-input-wrap">
-                    <span className="ccs-bid-prefix">₹</span>
-                    <input type="number" className="ccs-bid-input" value={budget} onChange={e => { const v = parseFloat(e.target.value); setBudget(v < 0 ? '0' : e.target.value); }} min="0" style={{ width: 140 }} />
-                  </div>
-                  <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>Most campaigns with a budget over ₹{formatBudget(budget || 1000)} run throughout the day.</small>
-                </div>
-              </div>
-            </div>
-
-            <div className="ccs-section-title" style={{ fontSize: 24, fontWeight: 700, marginTop: 32, marginBottom: 20 }}>Create an ad group</div>
-
-            <div className="ccs-field" style={{ marginBottom: 16 }}>
-              <label className="ccs-label">Ad group name <InfoIcon /></label>
-              <input className="ccs-input-full" style={{ maxWidth: 460 }} value={sdAdGroupName} onChange={e => setSdAdGroupName(e.target.value)} placeholder={`Ad group - ${todayDisplay}`} />
-            </div>
-
-            {/* Optimisation strategy */}
-          <div className="ccs-card" style={{ marginBottom: 16 }}>
-            <div className="ccs-card-header">
-              <span className="ccs-card-heading">Optimisation strategy <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to choose an optimization strategy</a>
-            </div>
-            <div className="ccs-card-body">
-              {SD_GOALS.map(g => (
-                <label key={g.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', padding: '10px 0' }}>
-                  <input type="radio" name="sdGoal" value={g.key} checked={sdGoal === g.key}
-                    onChange={() => { setSdGoal(g.key); setSdCostControlValue(g.ccDefault); }}
-                    style={{ accentColor: '#0073bb', flexShrink: 0, marginTop: 2 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>{g.label} <InfoIcon /></div>
-                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.4, marginTop: 2 }}>{g.desc}</div>
-                    <div style={{ fontSize: 11, color: '#777', marginTop: 4 }}>{g.costLine}</div>
-                  </div>
-                </label>
-              ))}
-
-              <div style={{ borderTop: '1px solid var(--amazon-border)', marginTop: 8, paddingTop: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Cost control</div>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={sdCostControlEnabled} onChange={e => setSdCostControlEnabled(e.target.checked)} style={{ marginTop: 3 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      Keep success metric at or below a desired value <InfoIcon /> <span className="ccs-beta-badge">Beta</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.4, marginTop: 2 }}>
-                      We will set your bids and add targets while your campaign is running to try to stay at or below a metric value you specify. It can take {sdGoalCfg.ccDuration} to achieve the desired result.
-                    </div>
-                  </div>
-                </label>
-                {sdCostControlEnabled && (
-                  <div style={{ marginTop: 12, paddingLeft: 26 }}>
-                    <label className="ccs-label" style={{ fontWeight: 700 }}>{sdGoalCfg.ccLabel}</label>
-                    <div className="ccs-bid-input-wrap" style={{ marginTop: 4, width: 'fit-content' }}>
-                      <span className="ccs-bid-prefix">₹</span>
-                      <input type="number" className="ccs-bid-input" value={sdCostControlValue}
-                        onChange={e => { const v = parseFloat(e.target.value); setSdCostControlValue(v < 0 ? '0' : e.target.value); }}
-                        min="0" style={{ width: 140 }} />
-                    </div>
-                    <div style={{ fontSize: 12, color: '#555', marginTop: 4, maxWidth: 500 }}>{sdGoalCfg.ccHelper(sdCostControlValue)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Ad format */}
-          <div className="ccs-card" style={{ marginBottom: 16 }}>
-            <div className="ccs-card-header">
-              <span className="ccs-card-heading">Ad format <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to choose your ad format</a>
-            </div>
-            <div className="ccs-card-body">
-              <div style={{ display: 'flex', gap: 16 }}>
-                {[
-                  {
-                    key: 'image', label: 'Image', caption: 'Promote your product with an optional image',
-                    mockup: (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14 }}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <div style={{ width: 46, height: 46, borderRadius: 4, background: 'var(--amazon-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Shirt size={22} color="white" /></div>
-                          <div style={{ width: 46, height: 46, borderRadius: 4, background: 'var(--amazon-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ImageIcon size={22} color="white" /></div>
-                        </div>
-                        <div style={{ color: 'var(--amazon-orange)', fontSize: 13, letterSpacing: 1 }}>★★★★★</div>
-                        <div style={{ height: 8, width: '70%', borderRadius: 4, background: 'var(--amazon-orange)', opacity: 0.85 }} />
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'video', label: 'Video', caption: 'Feature products or brands in an autoplaying video.',
-                    mockup: (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14 }}>
-                        <div style={{ height: 60, borderRadius: 4, background: 'var(--amazon-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Play size={26} color="white" fill="white" /></div>
-                        <div style={{ height: 8, width: '45%', borderRadius: 4, background: 'var(--amazon-orange)', opacity: 0.85 }} />
-                        <div style={{ height: 8, width: '75%', borderRadius: 4, background: 'var(--amazon-orange)', opacity: 0.85 }} />
-                      </div>
-                    ),
-                  },
-                ].map(fmt => (
-                  <label key={fmt.key} style={{
-                    display: 'block', cursor: 'pointer', width: 300, borderRadius: 4,
-                    border: sdAdFormat === fmt.key ? '2px solid #0073bb' : '1px solid var(--amazon-border)',
-                    background: sdAdFormat === fmt.key ? '#f0f7ff' : 'white',
-                  }}>
-                    <div style={{ padding: '10px 14px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="radio" name="sdAdFormat" checked={sdAdFormat === fmt.key} onChange={() => setSdAdFormat(fmt.key)} style={{ accentColor: '#0073bb' }} />
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>{fmt.label}</span>
-                    </div>
-                    <div style={{ margin: '8px 14px 0', background: '#f7f8fa', border: '1px solid #e5e5e5', borderRadius: 4 }}>{fmt.mockup}</div>
-                    <div style={{ fontSize: 12, color: '#555', padding: '8px 14px 14px', lineHeight: 1.4 }}>{fmt.caption}</div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Products to advertise */}
-          <div className="ccs-card" style={{ marginBottom: 16, borderColor: addedProducts.length === 0 ? '#c40000' : undefined }}>
-            <div className="ccs-card-header">
-              <span className="ccs-card-heading">Products to advertise <InfoIcon /></span>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to add products to your campaign</a>
-            </div>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--amazon-border)', fontSize: 12.5, color: '#333' }}>
-              ✨ On average, advertisers who promoted 10 or more products saw a 106% increase in impressions over a 30-day period compared to advertisers who did not. (Amazon internal data, 2022)
-            </div>
-            <div className="ccs-products-layout">
-              {/* Left: search/list/upload */}
-              <div className="ccs-products-left">
-                <div className="ccs-tab-row">
-                  {[['search', 'Search'], ['list', 'Enter list'], ['upload', 'Upload']].map(([k, l]) => (
-                    <button key={k} className={`ccs-tab ${productTab === k ? 'active' : ''}`} onClick={() => setProductTab(k)}>{l}</button>
-                  ))}
-                </div>
-
-                {productTab === 'search' && (
-                  <>
-                    <div className="ccs-search-row">
-                      <div className="ccs-search-wrap">
-                        <Search size={14} className="ccs-search-icon" />
-                        <input
-                          className="ccs-search-input"
-                          value={productSearch}
-                          onChange={e => setProductSearch(e.target.value)}
-                          placeholder="Search by product name, ASIN or SKU"
-                        />
-                      </div>
-                    </div>
-                    <div className="ccs-products-meta">
-                      <div className="ccs-show-row">
-                        <span>Sort by date added</span>
-                        <div style={{ position: 'relative' }}>
-                          <button className="ccs-filter-btn-sm" onClick={() => setProductSortOpen(o => !o)}>
-                            {productSort === 'newest' ? 'Descending' : 'Ascending'} <ChevronDown size={11} />
-                          </button>
-                          {productSortOpen && (
-                            <div className="ccs-sort-dropdown">
-                              {[['newest', 'Descending'], ['oldest', 'Ascending']].map(([k, l]) => (
-                                <button key={k} className={`ccs-sort-option ${productSort === k ? 'selected' : ''}`}
-                                  onClick={() => { setProductSort(k); setProductSortOpen(false); }}>{l}</button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <button className="link-btn ccs-add-all" onClick={() => filteredProducts.forEach(addProduct)}>
-                        Add all on this page
-                      </button>
-                    </div>
-                    <div className="ccs-product-list">
-                      {filteredProducts.map(p => {
-                        const added = !!addedProducts.find(x => x.asin === p.asin);
-                        return (
-                          <div key={p.asin} className="ccs-product-row">
-                            <ProductImage imageType={p.imageType} />
-                            <div className="ccs-product-details">
-                              <div className="ccs-product-name-link">{p.name}</div>
-                              <div className="ccs-product-sub">
-                                <Stars rating={p.rating} />
-                                <span className="ccs-product-count">({p.reviews})</span>
-                                <span className="ccs-product-price-tag">₹{p.price.toLocaleString('en-IN')}</span>
-                                <span className={`ccs-stock-badge ${p.status === 'In stock' ? 'in' : 'out'}`}>
-                                  {p.status === 'In stock' ? '●' : '○'} {p.status}
-                                </span>
-                              </div>
-                              <div className="ccs-product-asin-row">
-                                <span>ASIN: {p.asin}</span>
-                                <span style={{ marginLeft: 16 }}>SKU: {p.sku}</span>
-                              </div>
-                            </div>
-                            <button
-                              className={`ccs-add-btn ${added ? 'added' : ''}`}
-                              onClick={() => !added && addProduct(p)}
-                              disabled={added}
-                            >
-                              {added ? 'Added' : 'Add'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                      <div className="ccs-pagination">
-                        <span>1-{filteredProducts.length} of {filteredProducts.length} results</span>
-                        <div className="ccs-page-btns">
-                          <button className="ccs-page-btn" disabled>‹</button>
-                          <button className="ccs-page-btn" disabled>›</button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {productTab === 'list' && (
-                  <div className="ccs-list-tab">
-                    <p className="ccs-list-desc">Enter a list of ASINs or SKUs, one per line or separated by commas.</p>
-                    <textarea
-                      className="ccs-textarea"
-                      rows={8}
-                      value={asinListText}
-                      onChange={e => setAsinListText(e.target.value)}
-                      placeholder={"B0CF244HDV\nB0CF24MSGB\nB0CF277SZN"}
-                    />
-                    <div className="ccs-list-actions">
-                      <button className="btn btn-secondary" onClick={handleAddFromList}>Add to list</button>
-                      <span className="ccs-list-hint">
-                        {asinListText ? `${asinListText.split(/[\n,\s]+/).filter(Boolean).length} ASIN(s) entered` : ''}
-                      </span>
-                    </div>
-                    {asinListText && (
-                      <div className="ccs-asin-chips">
-                        {asinListText.split(/[\n,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean).map(asin => {
-                          const validFmt = PROD_ASIN_RE.test(asin);
-                          const found = validFmt && allProducts.find(p => p.asin === asin);
-                          const chipClass = !validFmt ? 'invalid' : found ? 'valid' : 'invalid';
-                          return (
-                            <div key={asin} className={`ccs-asin-chip ${chipClass}`}>
-                              {asin}
-                              {!validFmt && <span className="ccs-chip-err"> — invalid ASIN format</span>}
-                              {validFmt && found && <span className="ccs-chip-name"> — {found.name.slice(0, 28)}…</span>}
-                              {validFmt && !found && <span className="ccs-chip-err"> — not in your listings</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {productTab === 'upload' && (
-                  <div className="ccs-upload-tab">
-                    <p className="ccs-list-desc">Use the template to make sure your information uploads accurately.</p>
-                    <button className="ccs-csv-template-btn" onClick={downloadTemplate}>
-                      <span className="ccs-csv-icon">⬇</span> Download the CSV template
-                    </button>
-                    <label
-                      className={`ccs-drop-zone ${dragOver ? 'drag-over' : ''}`}
-                      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={e => { e.preventDefault(); setDragOver(false); handleFileInput(e.dataTransfer.files[0]); }}
-                    >
-                      <input
-                        type="file"
-                        accept=".csv,.tsv,.xlsx,.txt"
-                        style={{ display: 'none' }}
-                        onChange={e => handleFileInput(e.target.files[0])}
-                      />
-                      <div className="ccs-drop-icon">⬆</div>
-                      <div className="ccs-drop-text">Drag and drop file to add</div>
-                      <div className="ccs-drop-sub">or click to select from your computer</div>
-                      <div className="ccs-drop-formats">Accepted formats: CSV, TSV, XLSX</div>
-                    </label>
-                    {uploadState && (
-                      <div className="ccs-upload-results">
-                        <div className="ccs-upload-results-header">
-                          <span className="ccs-upload-filename">📄 {uploadState.fileName}</span>
-                          <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setUploadState(null)}>Clear</button>
-                        </div>
-                        <div className="ccs-upload-summary">
-                          <span className="ccs-upload-stat found">✓ {uploadState.results.filter(r => r.found).length} products added</span>
-                          {uploadState.results.filter(r => !r.found).length > 0 && (
-                            <span className="ccs-upload-stat notfound">✗ {uploadState.results.filter(r => !r.found).length} not in your listings (skipped)</span>
-                          )}
-                        </div>
-                        <div className="ccs-upload-rows">
-                          {uploadState.results.map(r => (
-                            <div key={r.asin} className={`ccs-upload-row ${r.found ? 'valid' : 'invalid'}`}>
-                              <span className="ccs-upload-check">{r.found ? '✓' : '✗'}</span>
-                              <span className="ccs-upload-asin">{r.asin}</span>
-                              {r.found && <span className="ccs-upload-pname">{r.product.name.slice(0, 45)}…</span>}
-                              {!r.found && <span className="ccs-upload-err">{!r.validFormat ? 'Invalid ASIN format' : 'Not in your listings'} — skipped</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Right: added products panel */}
-              <div className="ccs-products-right">
-                <div className="ccs-added-header">
-                  <strong>{addedProducts.length} products</strong>
-                  {addedProducts.length > 0 && (
-                    <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedProducts([])}>Remove all</button>
-                  )}
-                </div>
-                {addedProducts.length === 0 ? (
-                  <div className="ccs-added-empty">Add products</div>
-                ) : (
-                  <div className="ccs-added-list">
-                    {addedProducts.map(p => (
-                      <div key={p.asin} className="ccs-added-item">
-                        <ProductImage imageType={p.imageType} size={36} />
-                        <div className="ccs-added-info">
-                          <div className="ccs-added-name">{p.name.slice(0, 50)}…</div>
-                          <div className="ccs-added-asin">ASIN: {p.asin}</div>
-                        </div>
-                        <button className="ccs-remove-btn" onClick={() => removeProduct(p.asin)}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          {addedProducts.length === 0 && (
-            <div style={{ color: '#c40000', fontSize: 13, marginTop: -10, marginBottom: 16 }}>❗ Add at least one product to advertise</div>
-          )}
-
-          {/* Targeting */}
-          <div className="ccs-card" style={{ marginBottom: 16, borderColor: sdTargetTotal === 0 ? '#c40000' : undefined }}>
-            <div className="ccs-card-header">
-              <span className="ccs-card-heading">Targeting <InfoIcon /></span>
-            </div>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--amazon-border)', fontSize: 12.5, color: '#333' }}>
-              ✨ On average, advertisers who use Sponsored Display audiences see up to 74% of their sales driven by new-to-brand customers. (Amazon internal data, 2022)
-            </div>
-            <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--amazon-border)' }}>
-              <div style={{ position: 'relative' }}>
-                <button className="ccs-filter-btn-sm" onClick={() => setSdTargetFilterOpen(o => !o)}>
-                  {sdTargetView ? SD_TARGET_CATEGORIES.find(c => c.key === sdTargetView)?.label : 'All'} <ChevronDown size={11} />
-                </button>
-                {sdTargetFilterOpen && (
-                  <div className="ccs-sort-dropdown">
-                    <button className={`ccs-sort-option ${!sdTargetView ? 'selected' : ''}`} onClick={() => { setSdTargetView(null); setSdTargetFilterOpen(false); }}>All</button>
-                    {SD_TARGET_CATEGORIES.map(c => (
-                      <button key={c.key} className={`ccs-sort-option ${sdTargetView === c.key ? 'selected' : ''}`} onClick={() => { setSdTargetView(c.key); setSdTargetFilterOpen(false); }}>{c.label}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="ccs-search-wrap" style={{ flex: 1 }}>
-                <Search size={14} className="ccs-search-icon" />
-                <input className="ccs-search-input" placeholder="Search targeting" value={sdTargetSearch} onChange={e => setSdTargetSearch(e.target.value)} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-              {/* LEFT */}
-              <div style={{ borderRight: '1px solid var(--amazon-border)' }}>
-                {sdTargetView === null && SD_TARGET_CATEGORIES
-                  .filter(c => !sdTargetSearch || c.label.toLowerCase().includes(sdTargetSearch.toLowerCase()))
-                  .map(c => (
-                    <button key={c.key} onClick={() => setSdTargetView(c.key)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', textAlign: 'left', padding: 16, border: 'none', borderBottom: '1px solid var(--amazon-border)', background: 'white', cursor: 'pointer' }}>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{c.label}</div>
-                        <div style={{ fontSize: 12, color: '#555', maxWidth: 480 }}>{c.desc}</div>
-                      </div>
-                      <ChevronRight size={16} color="#888" />
-                    </button>
-                  ))}
-
-                {sdTargetView !== null && (() => {
-                  const catCfg = SD_TARGET_CATEGORIES.find(c => c.key === sdTargetView);
-                  const isContextual = sdTargetView === 'contextual';
-                  const dynSegs = SD_DYNAMIC_SEGMENTS[sdTargetView] || [];
-                  const filteredDynSegs = sdTargetView === 'remarketing' ? dynSegs.filter(s => s.lookbackType === sdLookbackType) : dynSegs;
-                  const namedAudiences = SD_AUDIENCES.filter(a => a.group === sdTargetView && (!sdTargetSearch || a.label.toLowerCase().includes(sdTargetSearch.toLowerCase())));
-                  const BidRow = (
-                    <div style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>Bid <InfoIcon /></span>
-                        <div style={{ position: 'relative' }}>
-                          <button className="ccs-filter-btn-sm" onClick={() => {
-                            if (sdCostControlEnabled) { setSdBidLockTooltipOpen(o => !o); return; }
-                            setSdBidModeDropOpen(o => !o);
-                          }}>
-                            {!sdCostControlEnabled && sdBidMode === 'custom' ? 'Custom bid' : 'Suggested bid'} <ChevronDown size={11} />
-                          </button>
-                          {sdBidLockTooltipOpen && sdCostControlEnabled && (
-                            <div className="ccs-bid-lock-tooltip">
-                              <button className="ccs-bid-lock-tooltip-close" onClick={() => setSdBidLockTooltipOpen(false)}>×</button>
-                              <p>Bid controls are not available when you set a desired outcome for a primary metric. We will optimise bids to meet the desired outcome.</p>
-                            </div>
-                          )}
-                          {sdBidModeDropOpen && !sdCostControlEnabled && (
-                            <div className="ccs-bid-mode-dropdown">
-                              {[
-                                { k: 'suggested', label: 'Suggested bid', desc: 'Based on past bidding activity to predict bids that are more likely to win' },
-                                { k: 'custom', label: 'Custom bid', desc: 'Can customise bids for each target without overriding your set bid amount' },
-                              ].map(opt => (
-                                <button key={opt.k} className={`ccs-bid-mode-option ${sdBidMode === opt.k ? 'selected' : ''}`}
-                                  onClick={() => { setSdBidMode(opt.k); setSdBidModeDropOpen(false); }}>
-                                  <strong>{opt.label}</strong>
-                                  <span>{opt.desc}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        {!sdCostControlEnabled && sdBidMode === 'custom' && (
-                          <div className="ccs-bid-input-wrap">
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value={sdCustomBid} style={{ width: 70 }}
-                              onChange={e => { const v = parseFloat(e.target.value); setSdCustomBid(v < 0 ? '0' : e.target.value); }} min="0" />
-                          </div>
-                        )}
-                        <span style={{ fontSize: 12, color: '#555' }}>per click (CPC)</span>
-                      </div>
-                      {!sdCostControlEnabled && sdBidMode === 'custom' && (
-                        <div style={{ fontSize: 12, color: '#555', marginTop: 8 }}>✨ On average, suggested bids drive 1.8x higher clicks than custom bids. (Amazon internal data, 2022)</div>
-                      )}
-                    </div>
-                  );
-                  // Amazon always shows the suggestion count / "Add all" bar for a targeting
-                  // group — even when there are zero dynamic-segment suggestions (e.g.
-                  // In-market / Interest & lifestyle, which have no behavior-based segments).
-                  // The "Dynamic segments" sub-heading + rows only render when there's
-                  // actually something to list under it.
-                  const DynamicSegmentsBlock = (segs) => (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 16px', background: '#f7f7f7', borderTop: '1px solid var(--amazon-border)', borderBottom: '1px solid var(--amazon-border)' }}>
-                        <span style={{ fontSize: 13 }}>{segs.length} suggestion{segs.length !== 1 ? 's' : ''}</span>
-                        {segs.length > 0
-                          ? <button className="link-btn ccs-kw-add-all" onClick={() => segs.forEach(s => addSdAudience(s, sdLookbackDays))}>Add all</button>
-                          : <span style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>Add all</span>
-                        }
-                      </div>
-                      {segs.length > 0 && (
-                        <>
-                          <div style={{ padding: '10px 16px 4px', fontSize: 13, fontWeight: 700, color: '#333' }}>Dynamic segments <InfoIcon /></div>
-                          {segs.map(s => {
-                            const isAdded = !!sdAddedAudiences.find(a => a.key === s.key);
-                            return (
-                              <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                                <div>
-                                  <div style={{ fontSize: 12, color: '#555' }}>{s.type}</div>
-                                  <div style={{ fontSize: 13, fontWeight: 700 }}>{s.label} <InfoIcon tip={s.desc} /></div>
-                                  {s.lookbackType && <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Lookback: {sdLookbackDays} days</div>}
-                                </div>
-                                {isAdded
-                                  ? <span className="ccs-kw-added-text" style={{ fontStyle: 'italic' }}>Added</span>
-                                  : <button className="link-btn ccs-kw-add-link" onClick={() => addSdAudience(s, sdLookbackDays)}>Add</button>
-                                }
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-                    </>
-                  );
-                  // Section label for the real, browsable (non-dynamic) list differs by group:
-                  // Contextual → "Product categories", Remarketing → "Audience categories",
-                  // In-market / Interest & lifestyle → just "Audiences".
-                  const catsHeadingLabel = isContextual ? 'Product categories' : (sdTargetView === 'remarketing' ? 'Audience categories' : 'Audiences');
-                  const CategoriesFallback = ({ heading }) => (
-                    <>
-                      <div style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#333', background: '#f7f7f7', borderBottom: '1px solid var(--amazon-border)' }}>{heading}</div>
-                      {addedProducts.length === 0 ? (
-                        <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
-                          We could not find any related categories. Try searching for categories.
-                        </div>
-                      ) : isContextual ? (
-                        <div className="ccs-cat-list" style={{ maxHeight: 400, overflowY: 'auto' }}>
-                          {ALL_CATEGORIES.map(cat => (
-                            <CatRow key={cat.id} cat={cat} depth={0}
-                              expandedCats={expandedCats} setExpandedCats={setExpandedCats}
-                              addedProdTargets={addedProdTargets} addProdTarget={addProdTarget}
-                              setRefineTarget={() => {}} catSearch={sdTargetSearch} />
-                          ))}
-                        </div>
-                      ) : (
-                        namedAudiences.map(aud => {
-                          const isAdded = !!sdAddedAudiences.find(a => a.key === aud.key);
-                          return (
-                            <div key={aud.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                              <div style={{ maxWidth: 480 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700 }}>{aud.label}</div>
-                                <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{aud.desc}</div>
-                              </div>
-                              {isAdded ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addSdAudience({ ...aud, type: catCfg.label })}>Add</button>}
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  );
-                  // Remarketing browses its 2 fixed audience types; In-market / Interest &
-                  // lifestyle browse the full real taxonomy tree (always available, regardless
-                  // of whether a product has been added — Browse is manual, not suggestion-driven).
-                  const BrowseAudiences = () => (
-                    sdTargetView === 'remarketing' ? (
-                      <div style={{ maxHeight: 560, overflowY: 'auto' }}>
-                        {namedAudiences.map(aud => {
-                          const isAdded = !!sdAddedAudiences.find(a => a.key === aud.key);
-                          return (
-                            <div key={aud.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                              <div style={{ maxWidth: 480 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700 }}>{aud.label}</div>
-                                <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{aud.desc}</div>
-                              </div>
-                              {isAdded ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addSdAudience({ ...aud, type: catCfg.label })}>Add</button>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div style={{ maxHeight: 560, overflowY: 'auto' }}>
-                        <div style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#333', background: '#f7f7f7', borderBottom: '1px solid var(--amazon-border)' }}>All audiences</div>
-                        {(SD_AUDIENCE_TREE[sdTargetView] || []).map(cat => (
-                          <AudCatRow key={cat.id} cat={cat}
-                            expandedAudCats={expandedAudCats} setExpandedAudCats={setExpandedAudCats}
-                            addedKeys={new Set(sdAddedAudiences.map(a => a.key))}
-                            onAdd={item => addSdAudience({ key: item.id, label: item.name, type: SD_GROUP_SHORT_LABEL[sdTargetView] })}
-                            audSearch={sdTargetSearch} />
-                        ))}
-                      </div>
-                    )
-                  );
-                  // In-market / Interest & lifestyle have no context-free dynamic segments, so
-                  // their entire "Suggested" tab — count bar, heading, and list — is driven by
-                  // the added product(s): 0 until a product exists, then the relevant taxonomy
-                  // leaves (see getSdProductAudiences above).
-                  const ProductAudienceSuggestBlock = () => {
-                    const items = addedProducts.length > 0 ? getSdProductAudiences(sdTargetView) : [];
-                    const shortLabel = SD_GROUP_SHORT_LABEL[sdTargetView];
-                    return (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 16px', background: '#f7f7f7', borderTop: '1px solid var(--amazon-border)', borderBottom: '1px solid var(--amazon-border)' }}>
-                          <span style={{ fontSize: 13 }}>{items.length} suggestion{items.length !== 1 ? 's' : ''}</span>
-                          {items.length > 0
-                            ? <button className="link-btn ccs-kw-add-all" onClick={() => items.forEach(it => addSdAudience({ key: it.id, label: it.name, type: shortLabel }))}>Add all</button>
-                            : <span style={{ fontSize: 12, color: '#999', fontStyle: 'italic' }}>Add all</span>
-                          }
-                        </div>
-                        <div style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#333', background: '#f7f7f7', borderBottom: '1px solid var(--amazon-border)' }}>{catsHeadingLabel}</div>
-                        {addedProducts.length === 0 ? (
-                          <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
-                            We could not find any related categories. Try searching for categories.
-                          </div>
-                        ) : (
-                          items.map(it => {
-                            const isAdded = !!sdAddedAudiences.find(a => a.key === it.id);
-                            return (
-                              <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                                <div>
-                                  <div style={{ fontSize: 12, color: '#555' }}>{shortLabel}</div>
-                                  <div style={{ fontSize: 13, fontWeight: 700 }}>{it.name} <InfoIcon tip={it.desc} /></div>
-                                </div>
-                                {isAdded
-                                  ? <span className="ccs-kw-added-text">Added</span>
-                                  : <button className="link-btn ccs-kw-add-link" onClick={() => addSdAudience({ key: it.id, label: it.name, type: shortLabel })}>Add</button>
-                                }
-                              </div>
-                            );
-                          })
-                        )}
-                      </>
-                    );
-                  };
-
-                  return (
-                    <div style={{ maxHeight: 700, overflowY: 'auto' }}>
-                      <button className="link-btn" style={{ fontSize: 12, padding: '10px 14px', display: 'block' }} onClick={() => setSdTargetView(null)}>‹ Back</button>
-                      <div style={{ padding: '0 16px 10px', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>{catCfg.label} <InfoIcon tip={catCfg.desc} /></div>
-
-                      {isContextual && (
-                        <div className="ccs-tab-row" style={{ padding: '0 16px' }}>
-                          {[['categories', 'Categories'], ['individual', 'Individual products']].map(([k, l]) => (
-                            <button key={k} className={`ccs-tab ${sdCtxTab === k ? 'active' : ''}`} onClick={() => setSdCtxTab(k)}>{l} <InfoIcon /></button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* CONTEXTUAL > CATEGORIES */}
-                      {isContextual && sdCtxTab === 'categories' && (
-                        <>
-                          <div className="ccs-tab-row" style={{ padding: '0 16px' }}>
-                            {[['suggested', 'Suggested'], ['browse', 'Browse']].map(([k, l]) => (
-                              <button key={k} className={`ccs-tab ${sdCtxCatSubTab === k ? 'active' : ''}`} onClick={() => setSdCtxCatSubTab(k)}>{l}{k === 'suggested' && <> <InfoIcon /></>}</button>
-                            ))}
-                          </div>
-                          {BidRow}
-                          {sdCtxCatSubTab === 'suggested' && (
-                            <>
-                              {DynamicSegmentsBlock(dynSegs)}
-                              <CategoriesFallback heading={catsHeadingLabel} />
-                            </>
-                          )}
-                          {sdCtxCatSubTab === 'browse' && (
-                            <div className="ccs-cat-list" style={{ maxHeight: 560, overflowY: 'auto' }}>
-                              {ALL_CATEGORIES.map(cat => (
-                                <CatRow key={cat.id} cat={cat} depth={0}
-                                  expandedCats={expandedCats} setExpandedCats={setExpandedCats}
-                                  addedProdTargets={addedProdTargets} addProdTarget={addProdTarget}
-                                  setRefineTarget={() => {}} catSearch={sdTargetSearch} />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* CONTEXTUAL > INDIVIDUAL PRODUCTS */}
-                      {isContextual && sdCtxTab === 'individual' && (
-                        <>
-                          <div className="ccs-tab-row" style={{ padding: '0 16px' }}>
-                            {[['suggested', 'Suggested'], ['search', 'Search'], ['enter-list', 'Enter list']].map(([k, l]) => (
-                              <button key={k} className={`ccs-tab ${sdCtxIndivSubTab === k ? 'active' : ''}`} onClick={() => setSdCtxIndivSubTab(k)}>{l}{k !== 'enter-list' && <> <InfoIcon /></>}</button>
-                            ))}
-                          </div>
-                          {BidRow}
-                          {sdCtxIndivSubTab === 'suggested' && (
-                            addedProducts.length === 0 ? (
-                              <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
-                                No suggestions available. Try searching for products.
-                              </div>
-                            ) : (
-                              <div style={{ padding: '16px', fontSize: 13, color: '#555' }}>No individual product suggestions available yet.</div>
-                            )
-                          )}
-                          {sdCtxIndivSubTab === 'search' && (
-                            <div style={{ padding: '12px 16px' }}>
-                              <div className="ccs-search-wrap" style={{ marginBottom: 10 }}>
-                                <Search size={14} className="ccs-search-icon" />
-                                <input className="ccs-search-input" placeholder="Search by product name or ASIN" value={sdIndivSearch} onChange={e => setSdIndivSearch(e.target.value)} />
-                              </div>
-                              {!sdIndivSearch ? (
-                                <div style={{ padding: '20px 0', color: '#666', fontSize: 13, textAlign: 'center' }}>Search for products you want to target.</div>
-                              ) : (
-                                allProducts.filter(p => p.name.toLowerCase().includes(sdIndivSearch.toLowerCase()) || p.asin.toLowerCase().includes(sdIndivSearch.toLowerCase())).map(p => {
-                                  const id = `sd-indiv-${p.asin}`;
-                                  const isAdded = !!addedProdTargets.find(t => t.id === id);
-                                  return (
-                                    <div key={p.asin} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                      <div style={{ maxWidth: 400 }}>
-                                        <div style={{ fontSize: 13 }}>{p.name.slice(0, 60)}…</div>
-                                        <div style={{ fontSize: 11, color: '#888' }}>ASIN: {p.asin}</div>
-                                      </div>
-                                      {isAdded ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addSdProdTarget({ id, name: p.name.slice(0, 50), sugg: p.sugg, suggMin: p.suggMin, suggMax: p.suggMax })}>Add</button>}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          )}
-                          {sdCtxIndivSubTab === 'enter-list' && (
-                            <div style={{ padding: '12px 16px' }}>
-                              <p style={{ fontSize: 12.5, color: '#555', marginBottom: 8 }}>Enter a list of ASINs, one per line or separated by commas.</p>
-                              <textarea className="ccs-textarea" rows={6} value={sdIndivEnterList} onChange={e => setSdIndivEnterList(e.target.value)} placeholder={'B0CF244HDV\nB0CF24MSGB'} />
-                              <button className="btn btn-secondary" style={{ marginTop: 8 }} onClick={() => {
-                                const ASIN_RE = /^B[A-Z0-9]{9}$/;
-                                [...new Set(sdIndivEnterList.split(/[\n,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean))].forEach(asin => {
-                                  if (!ASIN_RE.test(asin)) return;
-                                  const found = allProducts.find(p => p.asin === asin);
-                                  addSdProdTarget({ id: `sd-indiv-${asin}`, name: found ? found.name.slice(0, 50) : asin, sugg: found?.sugg, suggMin: found?.suggMin, suggMax: found?.suggMax });
-                                });
-                                setSdIndivEnterList('');
-                              }}>Add to list</button>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* REMARKETING / IN-MARKET / INTEREST-LIFESTYLE */}
-                      {!isContextual && (
-                        <>
-                          <div className="ccs-tab-row" style={{ padding: '0 16px' }}>
-                            {[['suggested', 'Suggested'], ['browse', 'Browse']].map(([k, l]) => (
-                              <button key={k} className={`ccs-tab ${sdAudSubTab === k ? 'active' : ''}`} onClick={() => setSdAudSubTab(k)}>{l}{k === 'suggested' && <> <InfoIcon /></>}</button>
-                            ))}
-                          </div>
-                          {BidRow}
-                          {sdTargetView === 'remarketing' && sdAudSubTab === 'suggested' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px 12px' }}>
-                              <span style={{ fontSize: 13, fontWeight: 700 }}>Lookback</span>
-                              <div style={{ position: 'relative' }}>
-                                <button className="ccs-filter-btn-sm" onClick={() => setSdLookbackTypeDropOpen(o => !o)}>
-                                  {sdLookbackType === 'views' ? 'Views' : 'Purchases'} <ChevronDown size={11} />
-                                </button>
-                                {sdLookbackTypeDropOpen && (
-                                  <div className="ccs-sort-dropdown">
-                                    {[['views', 'Views'], ['purchases', 'Purchases']].map(([k, l]) => (
-                                      <button key={k} className={`ccs-sort-option ${sdLookbackType === k ? 'selected' : ''}`} onClick={() => { setSdLookbackType(k); setSdLookbackTypeDropOpen(false); }}>{l}</button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ position: 'relative' }}>
-                                <button className="ccs-filter-btn-sm" onClick={() => setSdLookbackDaysDropOpen(o => !o)}>
-                                  {sdLookbackDays} days <ChevronDown size={11} />
-                                </button>
-                                {sdLookbackDaysDropOpen && (
-                                  <div className="ccs-sort-dropdown">
-                                    {[7, 14, 30, 60, 90].map(d => (
-                                      <button key={d} className={`ccs-sort-option ${sdLookbackDays === d ? 'selected' : ''}`} onClick={() => { setSdLookbackDays(d); setSdLookbackDaysDropOpen(false); }}>{d} days</button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {sdAudSubTab === 'suggested' && (
-                            sdTargetView === 'remarketing' ? (
-                              <>
-                                {DynamicSegmentsBlock(filteredDynSegs)}
-                                <CategoriesFallback heading={catsHeadingLabel} />
-                              </>
-                            ) : (
-                              <ProductAudienceSuggestBlock />
-                            )
-                          )}
-                          {sdAudSubTab === 'browse' && <BrowseAudiences />}
-                        </>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* RIGHT */}
-              <div>
-                <div className="ccs-added-header">
-                  <strong>{sdTargetTotal} added</strong>
-                  {sdTargetTotal > 0 && (
-                    <button className="link-btn" style={{ fontSize: 12 }} onClick={() => { setAddedProdTargets([]); setSdAddedAudiences([]); }}>Remove all</button>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 128px 20px', alignItems: 'center', padding: '7px 16px', fontSize: 12, fontWeight: 600, color: '#555', background: '#f7f7f7', borderTop: '1px solid var(--amazon-border)', borderBottom: '1px solid var(--amazon-border)' }}>
-                  <span>Audiences, categories, products</span>
-                  <span>Sugg. bid <InfoIcon /><br/>
-                    {!sdCostControlEnabled && (
-                      <button className="link-btn" style={{ fontSize: 11, fontWeight: 500 }} onClick={() => {
-                        setAddedProdTargets(prev => prev.map(x => x.sugg ? { ...x, bid: x.sugg.toFixed(2) } : x));
-                        setSdAddedAudiences(prev => prev.map(x => x.sugg ? { ...x, bid: x.sugg.toFixed(2) } : x));
-                      }}>Apply all</button>
-                    )}
-                  </span>
-                  <span>Bid <InfoIcon /></span>
-                  <span />
-                </div>
-                {sdTargetTotal === 0 ? (
-                  <div className="ccs-added-empty" style={{ height: 560 }}>Add targets</div>
-                ) : (
-                  <div className="ccs-added-list" style={{ maxHeight: 610 }}>
-                    {addedProdTargets.map((t, i) => (
-                      <div key={`ct-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 128px 20px', alignItems: 'flex-start', gap: 6, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                        <div>
-                          <div style={{ fontSize: 12, color: '#555' }}>Contextual</div>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</div>
-                        </div>
-                        {t.sugg ? (
-                          <div style={{ fontSize: 12, color: '#555' }}>
-                            <div>₹{t.sugg.toFixed(2)}</div>
-                            {t.suggMin != null && <div style={{ fontSize: 11 }}>₹{t.suggMin.toFixed(2)} - ₹{t.suggMax.toFixed(2)}</div>}
-                          </div>
-                        ) : <span style={{ color: '#999', fontSize: 13 }}>-</span>}
-                        {sdCostControlEnabled ? (
-                          <div className="ccs-bid-input-wrap" style={{ width: 118, opacity: 0.5 }}>
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value="" placeholder="-" style={{ width: 80, padding: '8px 4px', textAlign: 'right' }} disabled />
-                          </div>
-                        ) : (
-                          <div className="ccs-bid-input-wrap" style={{ width: 118 }}>
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value={t.bid || ''} placeholder="-" style={{ width: 80, padding: '8px 4px', textAlign: 'right' }}
-                              onChange={e => setAddedProdTargets(prev => prev.map((x, idx) => idx === i ? { ...x, bid: e.target.value } : x))} />
-                          </div>
-                        )}
-                        <button className="ccs-remove-btn" onClick={() => setAddedProdTargets(prev => prev.filter((_, idx) => idx !== i))}>×</button>
-                      </div>
-                    ))}
-                    {sdAddedAudiences.map(a => (
-                      <div key={a.key} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 128px 20px', alignItems: 'flex-start', gap: 6, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                        <div>
-                          <div style={{ fontSize: 12, color: '#555' }}>{a.type}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{a.label} {a.desc && <InfoIcon tip={a.desc} />}</div>
-                          {a.lookbackDays && (
-                            <>
-                              <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Lookback: {a.lookbackDays} days</div>
-                              <div style={{ position: 'relative', marginTop: 2 }}>
-                                <button className="ccs-filter-btn-sm" style={{ fontSize: 11 }} onClick={() => setSdItemLookbackOpen(o => o === a.key ? null : a.key)}>
-                                  {a.lookbackType === 'views' ? 'Views' : 'Purchases'} {a.lookbackDays} days <ChevronDown size={10} />
-                                </button>
-                                {sdItemLookbackOpen === a.key && (
-                                  <div className="ccs-sort-dropdown">
-                                    {[7, 14, 30, 60, 90].map(d => (
-                                      <button key={d} className={`ccs-sort-option ${a.lookbackDays === d ? 'selected' : ''}`}
-                                        onClick={() => { setSdAddedAudiences(prev => prev.map(x => x.key === a.key ? { ...x, lookbackDays: d } : x)); setSdItemLookbackOpen(null); }}>{d} days</button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        {a.sugg ? (
-                          <div style={{ fontSize: 12, color: '#555' }}>
-                            <div>₹{a.sugg.toFixed(2)}</div>
-                            <div style={{ fontSize: 11 }}>₹{a.suggMin.toFixed(2)} - ₹{a.suggMax.toFixed(2)}</div>
-                          </div>
-                        ) : <span style={{ color: '#999', fontSize: 13 }}>-</span>}
-                        {sdCostControlEnabled ? (
-                          <div className="ccs-bid-input-wrap" style={{ width: 118, opacity: 0.5 }}>
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value="" placeholder="-" style={{ width: 80, padding: '8px 4px', textAlign: 'right' }} disabled />
-                          </div>
-                        ) : (
-                          <div className="ccs-bid-input-wrap" style={{ width: 118 }}>
-                            <span className="ccs-bid-prefix">₹</span>
-                            <input type="number" className="ccs-bid-input" value={a.bid || ''} placeholder="-" style={{ width: 80, padding: '8px 4px', textAlign: 'right' }}
-                              onChange={e => setSdAddedAudiences(prev => prev.map(x => x.key === a.key ? { ...x, bid: e.target.value } : x))} />
-                          </div>
-                        )}
-                        <button className="ccs-remove-btn" onClick={() => removeSdAudience(a.key)}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {sdTargetTotal === 0 && (
-              <div style={{ color: '#c40000', fontSize: 13, padding: '10px 16px', borderTop: '1px solid var(--amazon-border)' }}>❗ Please choose at least one audience.</div>
-            )}
-          </div>
-
-          {/* Creative */}
-          {addedProducts.length > 0 && (() => {
-            const SD_CREATIVE_IMAGE_SIZES = [
-              { key: 'product-page-right', label: 'Amazon product page right', w: 118, h: 160, layout: 'tall', hasButton: false },
-              { key: 'medium-rectangle', label: 'Medium rectangle', w: 150, h: 122, layout: 'tall', hasButton: true },
-              { key: 'mobile-pages', label: 'Amazon mobile pages', w: 210, h: 84, layout: 'wide', hasButton: true },
-              { key: 'product-detail-middle', label: 'Amazon product detail page middle', w: 210, h: 64, layout: 'wide', hasButton: true },
-              { key: 'leaderboard', label: 'Leaderboard', w: 230, h: 56, layout: 'wide', hasButton: false },
-              { key: 'billboard', label: 'Billboard', w: 250, h: 84, layout: 'wide', hasButton: true },
-              { key: 'amazon-apps', label: 'Amazon apps', w: 140, h: 140, layout: 'tall', hasButton: true },
-              { key: 'square', label: 'Square', w: 130, h: 130, layout: 'tall', hasButton: false },
-            ];
-            const SD_CREATIVE_VIDEO_SIZES = [
-              { key: 'mobile-rectangle', label: 'Amazon mobile rectangle' },
-              { key: 'medium-rectangle-v', label: 'Medium rectangle' },
-              { key: 'amazon-apps-v', label: 'Amazon apps' },
-            ];
-            const brandName = (campaignName || sdAdGroupName || 'Your Brand').replace(/^Campaign - .*/, 'Your Brand').replace(/^Ad group - .*/, 'Your Brand');
-            const pageSize = 4;
-            const isVideo = sdAdFormat === 'video';
-            const totalPages = isVideo ? SD_CREATIVE_VIDEO_SIZES.length : Math.ceil(SD_CREATIVE_IMAGE_SIZES.length / pageSize);
-            const previewIdx = Math.min(sdCrPreviewIdx, totalPages - 1);
-            const pageImageSizes = isVideo ? [] : SD_CREATIVE_IMAGE_SIZES.slice(previewIdx * pageSize, previewIdx * pageSize + pageSize);
-            const currentVideoSize = isVideo ? SD_CREATIVE_VIDEO_SIZES[previewIdx] : null;
-
-            return (
-              <div className="ccs-card" style={{ marginBottom: 16 }}>
-                <div className="ccs-card-header">
-                  <span className="ccs-card-heading">Creative</span>
-                  <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> How to customize your creative</a>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr' }}>
-                  {/* LEFT: customize panel */}
-                  <div style={{ borderRight: '1px solid var(--amazon-border)' }}>
-                    {sdCrDrill === null && (
-                      <>
-                        <div style={{ padding: '16px 16px 10px', fontSize: 13, color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          Choose how you would like to customise your ad. <InfoIcon tip="Turn these on to let Amazon assemble your ad using your logo, a headline, and/or an image alongside your product images." />
-                        </div>
-
-                        {isVideo && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: '1px solid var(--amazon-border)', cursor: 'pointer' }}
-                            onClick={() => setSdCrDrill('video')}>
-                            <span style={{ fontSize: 14, fontWeight: 700 }}>Video</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              {sdCrVideoFile ? <span className="ccs-kw-added-text">Added</span> : <span style={{ color: '#0073bb', fontSize: 13 }}>Add</span>}
-                              <ChevronRight size={16} color="#888" />
-                            </span>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: '1px solid var(--amazon-border)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <Toggle on={sdCrLogo} onChange={setSdCrLogo} />
-                            <span style={{ fontSize: 14, fontWeight: 700 }}>Logo</span>
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {sdCrLogo && (
-                              <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#067d62', color: 'white', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
-                            )}
-                            <button onClick={() => setSdCrDrill('logo')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><ChevronRight size={16} color="#888" /></button>
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: '1px solid var(--amazon-border)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <Toggle on={sdCrHeadline} onChange={setSdCrHeadline} />
-                            <span style={{ fontSize: 14, fontWeight: 700 }}>Headline</span>
-                          </span>
-                          <button onClick={() => setSdCrDrill('headline')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><ChevronRight size={16} color="#888" /></button>
-                        </div>
-
-                        {!isVideo && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: '1px solid var(--amazon-border)' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <Toggle on={sdCrImage} onChange={setSdCrImage} />
-                              <span style={{ fontSize: 14, fontWeight: 700 }}>Image</span>
-                            </span>
-                            <button onClick={() => setSdCrDrill('image')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><ChevronRight size={16} color="#888" /></button>
-                          </div>
-                        )}
-
-                        {!isVideo && (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '16px', color: '#333', fontSize: 12.5, borderTop: '1px solid var(--amazon-border)' }}>
-                            <Info size={13} style={{ marginTop: 1, flexShrink: 0, color: '#0073bb' }} />
-                            <span>AI-generated images are available.</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {sdCrDrill === 'video' && (
-                      <div style={{ padding: 16 }}>
-                        <button className="link-btn" style={{ fontSize: 13, marginBottom: 14, display: 'block' }} onClick={() => setSdCrDrill(null)}>‹ Back</button>
-                        <p style={{ fontSize: 13, color: '#333', lineHeight: 1.5, marginBottom: 14 }}>Pick a brief, engaging video that showcases your products in action with sound. Video will auto-play on mute.</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
-                          <label className="ccs-csv-template-btn" style={{ cursor: 'pointer' }}>
-                            <span className="ccs-csv-icon">⬆</span> Upload video
-                            <input type="file" accept="video/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && setSdCrVideoFile(e.target.files[0].name)} />
-                          </label>
-                          <a href="#" onClick={e => e.preventDefault()} className="ccs-help-link">Choose from creative assets</a>
-                        </div>
-                        {sdCrVideoFile && <div style={{ fontSize: 12.5, color: '#007600', marginBottom: 14 }}>✓ {sdCrVideoFile} selected</div>}
-                        <div style={{ border: '1px solid var(--amazon-border)', borderRadius: 6, padding: 16 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                            <strong style={{ fontSize: 14 }}>Video specs</strong>
-                            <a href="#" onClick={e => e.preventDefault()} className="ccs-help-link" style={{ fontSize: 12 }}>See video guidelines</a>
-                          </div>
-                          <ul style={{ fontSize: 12.5, color: '#333', lineHeight: 1.9, paddingLeft: 18, margin: 0 }}>
-                            <li><strong>Aspect ratio:</strong> 16:9</li>
-                            <li><strong>Dimensions:</strong> 1920 x 1080 (min)</li>
-                            <li><strong>Max file size:</strong> 500 MB</li>
-                            <li><strong>File format:</strong> H.264, MPEG-2, MPEG-4</li>
-                            <li><strong>Length:</strong> 6–45 sec</li>
-                            <li><strong>Frame rate:</strong> 23.976, 24, 25, 29.97, 29.98 or 30 fps</li>
-                            <li><strong>Bitrate:</strong> 1 Mbps or higher</li>
-                            <li><strong>Video stream:</strong> 1 only</li>
-                          </ul>
-                          <strong style={{ fontSize: 14, display: 'block', marginTop: 14, marginBottom: 6 }}>Audio specs</strong>
-                          <ul style={{ fontSize: 12.5, color: '#333', lineHeight: 1.9, paddingLeft: 18, margin: 0 }}>
-                            <li><strong>Language:</strong> Must match ad locale</li>
-                            <li><strong>Sample rate:</strong> 44.1 kHz or 48 kHz</li>
-                            <li><strong>Codec:</strong> PCM or AAC</li>
-                            <li><strong>Bit rate:</strong> 96 kbps or higher</li>
-                            <li><strong>Format:</strong> Stereo or mono</li>
-                            <li><strong>Audio stream:</strong> 1 only</li>
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-
-                    {sdCrDrill === 'logo' && (
-                      <div style={{ padding: 16 }}>
-                        <button className="link-btn" style={{ fontSize: 13, marginBottom: 14, display: 'block' }} onClick={() => setSdCrDrill(null)}>‹ Back</button>
-                        <p style={{ fontSize: 13, color: '#333', lineHeight: 1.5, marginBottom: 14 }}>Your logo helps shoppers recognise your brand. We use the logo from your brand registration by default.</p>
-                        <label className="ccs-csv-template-btn" style={{ cursor: 'pointer' }}>
-                          <span className="ccs-csv-icon">⬆</span> Change logo
-                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={() => setSdCrLogo(true)} />
-                        </label>
-                      </div>
-                    )}
-
-                    {sdCrDrill === 'headline' && (
-                      <div style={{ padding: 16 }}>
-                        <button className="link-btn" style={{ fontSize: 13, marginBottom: 14, display: 'block' }} onClick={() => setSdCrDrill(null)}>‹ Back</button>
-                        <p style={{ fontSize: 13, color: '#333', lineHeight: 1.5, marginBottom: 10 }}>Add a short, compelling headline to appear alongside your product.</p>
-                        <input className="ccs-input-full" maxLength={50} placeholder="Enter a headline" value={sdCrHeadlineText}
-                          onChange={e => { setSdCrHeadlineText(e.target.value); setSdCrHeadline(!!e.target.value); }} />
-                        <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{sdCrHeadlineText.length}/50 characters</div>
-                      </div>
-                    )}
-
-                    {sdCrDrill === 'image' && (
-                      <div style={{ padding: 16 }}>
-                        <button className="link-btn" style={{ fontSize: 13, marginBottom: 14, display: 'block' }} onClick={() => setSdCrDrill(null)}>‹ Back</button>
-                        <p style={{ fontSize: 13, color: '#333', lineHeight: 1.5, marginBottom: 14 }}>Add a custom image to feature alongside your product, or generate one with AI.</p>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          <label className="ccs-csv-template-btn" style={{ cursor: 'pointer' }}>
-                            <span className="ccs-csv-icon">⬆</span> Upload image
-                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={() => setSdCrImage(true)} />
-                          </label>
-                          <button className="btn btn-secondary" onClick={() => setSdCrImage(true)}>✨ Generate with AI</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* RIGHT: preview panel */}
-                  <div style={{ padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <strong style={{ fontSize: 13 }}>Preview:</strong>
-                      <div style={{ position: 'relative' }}>
-                        <button className="ccs-filter-btn-sm" onClick={() => setSdCrPreviewDropOpen(o => !o)}>
-                          {isVideo ? currentVideoSize.label : 'Key ad sizes'} <ChevronDown size={11} />
-                        </button>
-                        {sdCrPreviewDropOpen && (
-                          <div className="ccs-sort-dropdown">
-                            {(isVideo ? SD_CREATIVE_VIDEO_SIZES : [{ key: 'key-ad-sizes', label: 'Key ad sizes' }]).map(opt => (
-                              <button key={opt.key} className="ccs-sort-option selected"
-                                onClick={() => { if (isVideo) setSdCrPreviewIdx(SD_CREATIVE_VIDEO_SIZES.findIndex(s => s.key === opt.key)); setSdCrPreviewDropOpen(false); }}>
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ flex: 1 }} />
-                      <span style={{ fontSize: 13, color: '#333' }}>{previewIdx + 1} of {totalPages}</span>
-                      <button className="ccs-page-btn" disabled={previewIdx === 0} onClick={() => setSdCrPreviewIdx(i => Math.max(0, i - 1))}>‹</button>
-                      <button className="ccs-page-btn" disabled={previewIdx === totalPages - 1} onClick={() => setSdCrPreviewIdx(i => Math.min(totalPages - 1, i + 1))}>›</button>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#555', marginBottom: 14 }}>These previews are examples only and may not show all possible versions of your ad.</div>
-
-                    {!isVideo ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, background: '#1a1a1a', borderRadius: 4, overflow: 'hidden' }}>
-                        {pageImageSizes.map(size => (
-                          <div key={size.key} style={{ padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minHeight: 190 }}>
-                            <div style={{ width: size.w, height: size.h, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
-                              <SdAdMockup layout={size.layout} hasButton={size.hasButton} brandName={brandName}
-                                products={sdCrImage || addedProducts.length > 0 ? addedProducts : []}
-                                headlineOn={sdCrHeadline} headlineText={sdCrHeadlineText} />
-                            </div>
-                            <div style={{ color: 'white', fontSize: 13, fontWeight: 700, marginTop: 12, textAlign: 'center' }}>{size.label}</div>
-                          </div>
-                        ))}
-                        {Array.from({ length: Math.max(0, pageSize - pageImageSizes.length) }).map((_, i) => (
-                          <div key={`empty-${i}`} style={{ minHeight: 190 }} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ background: '#1a1a1a', borderRadius: 4, padding: '16px 16px 30px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'white', fontSize: 13, marginBottom: 14 }}>
-                          <a href="#" onClick={e => e.preventDefault()} style={{ color: 'white', display: 'flex', alignItems: 'center', gap: 4 }}><Search size={13} /> View full size</a>
-                          <a href="#" onClick={e => e.preventDefault()} style={{ color: 'white' }}>Where will my ad show?</a>
-                        </div>
-                        <div style={{ width: 320, height: 250, margin: '0 auto', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
-                          <SdVideoMockup brandName={brandName} headlineOn={sdCrHeadline} headlineText={sdCrHeadlineText} logoOn={sdCrLogo} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Bottom launch */}
-          <div className="ccs-bottom-bar">
-            <div />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-secondary" onClick={() => navigate('/create-campaign')}>Save as draft</button>
-              <button className="btn btn-dark" onClick={handleLaunchSD}>Launch campaign</button>
-            </div>
-          </div>
-
-          </div>{/* end ccs-main */}
-
-          {/* ── FORECAST SIDEBAR ── */}
-          <div className="ccs-sidebar">
-            <div className="ccs-forecast-card">
-              <div className="ccs-forecast-title">
-                Forecast <InfoIcon />
-                <span className="ccs-beta-badge">Beta</span>
-              </div>
-              <p className="ccs-forecast-desc">Estimates of performance are based on historical campaigns with similar products, optimisation strategy, bids, targets, and budget.</p>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}><Info size={12} /> Learn about forecasts</a>
-              <div style={{ marginTop: 14 }}>
-                <button className="ccs-filter-btn-sm">Weekly <ChevronDown size={11} /></button>
-              </div>
-              <div className="ccs-forecast-row"><span>Cost type: {sdGoalCfg.costType}</span></div>
-              {sdGoalCfg.forecastMetrics.map(m => (
-                <div className="ccs-forecast-metric" key={m}>
-                  <span>{m} <InfoIcon /></span>
-                  <span>–</span>
-                </div>
-              ))}
-              {sdMissing.length > 0 && (
-                <div className="ccs-forecast-hint">
-                  <p>To see a forecast:</p>
-                  <ul>
-                    {sdMissing.map(m => <li key={m}>{m}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>{/* end ccs-body */}
-      </div>
-    );
-  }
-  // ─────────────────────────────────────────────────────────────────
+  // Adding an ad group to a campaign that no longer exists: back to Campaigns.
+  if (adGroupMode && !parentCampaign) return <Navigate to={ROUTES.allCampaigns} replace />;
 
   return (
     <div className="ccs-root">
@@ -6111,14 +3933,25 @@ export default function CreateCampaignSetup() {
         {/* ── Main content ── */}
         <div className="ccs-main">
 
+          {launchErrors.length > 0 && (
+            <div className="sb-alert" role="alert">
+              <strong>Fix the following to {adGroupMode ? 'create your ad group' : 'launch your campaign'}:</strong>
+              <ul>{launchErrors.map(e => <li key={e}>{e}</li>)}</ul>
+            </div>
+          )}
+
+          {/* ══ CAMPAIGN SETUP (Standard / Preset) ══ */}
+          {!adGroupMode && <CampaignSetupCard value={spSetup} onChange={changeSpSetup} />}
+
           {/* ══ AD GROUPS ══ */}
+          {!isPreset && <>
           <div className="ccs-section-title">Ad Groups</div>
 
           <div className="ccs-card">
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Ad group settings</span>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to create an ad group
+                <CircleHelp size={13} /> How to create an ad group
               </a>
             </div>
             <div className="ccs-card-body">
@@ -6129,12 +3962,17 @@ export default function CreateCampaignSetup() {
             </div>
           </div>
 
+          {/* ══ SITES ══ */}
+          <SitesCard value={spSite} onChange={setSpSite} isReadOnly={adGroupMode} />
+          {isBusinessSite && <p className="sb-notice">To view your products, you must sign in to your Amazon Business shopper account.</p>}
+          </>}
+
           {/* ══ PRODUCTS ══ */}
           <div className="ccs-card">
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Products <InfoIcon /></span>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to add products to your campaign
+                <CircleHelp size={13} /> How to add products to your campaign
               </a>
             </div>
             <div className="ccs-products-layout">
@@ -6194,9 +4032,9 @@ export default function CreateCampaignSetup() {
                               <div className="ccs-product-sub">
                                 <Stars rating={p.rating} />
                                 <span className="ccs-product-count">({p.reviews})</span>
-                                <span className="ccs-product-price-tag">₹{p.price.toLocaleString('en-IN')}</span>
+                                <span className="ccs-product-price-tag">₹{p.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                                 <span className={`ccs-stock-badge ${p.status === 'In stock' ? 'in' : 'out'}`}>
-                                  {p.status === 'In stock' ? '●' : '○'} {p.status}
+                                  {p.status !== 'In stock' && <InfoIcon />} {p.status}
                                 </span>
                               </div>
                               <div className="ccs-product-asin-row">
@@ -6319,8 +4157,8 @@ export default function CreateCampaignSetup() {
               {/* Right: added products panel */}
               <div className="ccs-products-right">
                 <div className="ccs-added-header">
-                  <strong>{addedProducts.length} products</strong>
-                  {addedProducts.length > 0 && (
+                  <strong>{addedProducts.length} product{addedProducts.length === 1 ? '' : 's'}</strong>
+                  {addedProducts.length > 1 && (
                     <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedProducts([])}>Remove all</button>
                   )}
                 </div>
@@ -6329,13 +4167,16 @@ export default function CreateCampaignSetup() {
                 ) : (
                   <div className="ccs-added-list">
                     {addedProducts.map(p => (
-                      <div key={p.asin} className="ccs-added-item">
-                        <ProductImage imageType={p.imageType} size={36} />
-                        <div className="ccs-added-info">
-                          <div className="ccs-added-name">{p.name.slice(0,50)}…</div>
-                          <div className="ccs-added-asin">ASIN: {p.asin}</div>
+                      <div key={p.asin} className="pd-added">
+                        <ProductImage imageType={p.imageType} size={60} />
+                        <div className="pd-info">
+                          <span className="pd-title">{p.name}</span>
+                          <span className="pd-meta"><Stars rating={p.rating} /><span className="pd-count">({p.reviews})</span><span className="pd-price">₹{Number(p.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
+                          <span className={`pd-stock ${p.status === 'In stock' ? '' : 'is-out'}`}>{p.status !== 'In stock' && <InfoIcon />} {p.status}</span>
+                          <span className="pd-id">ASIN: {p.asin}</span>
+                          <span className="pd-id">SKU: {p.sku}</span>
                         </div>
-                        <button className="ccs-remove-btn" onClick={() => removeProduct(p.asin)}>×</button>
+                        <button className="pd-remove" aria-label="Remove" onClick={() => removeProduct(p.asin)}>×</button>
                       </div>
                     ))}
                   </div>
@@ -6344,13 +4185,24 @@ export default function CreateCampaignSetup() {
             </div>
           </div>
 
+          {/* ══ PRESET: only name, dates and budget ══ */}
+          {isPreset && (
+            <PresetSettingsCard
+              name={campaignName} onName={setCampaignName}
+              startDate={startDate} onStartDate={setStartDate}
+              endDate={endDate} onEndDate={setEndDate}
+              budget={budget} onBudget={setBudget}
+            />
+          )}
+
+          {!isPreset && <>
           {/* ══ TARGETING ══ */}
           {!adGroupMode && (
           <div className="ccs-card">
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Targeting <InfoIcon /></span>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> Choose automatic or manual targeting
+                <CircleHelp size={13} /> Choose automatic or manual targeting
               </a>
             </div>
             <div className="ccs-card-body">
@@ -6376,7 +4228,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card-header">
                 <span className="ccs-card-heading">Automatic Targeting <InfoIcon /></span>
                 <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                  <Info size={12} /> How to set bid pricing
+                  <CircleHelp size={13} /> How to set bid pricing
                 </a>
               </div>
               <div className="ccs-card-body">
@@ -6388,7 +4240,7 @@ export default function CreateCampaignSetup() {
                       <div className="ccs-auto-default-bid">
                         <div className="ccs-sugg-bid-row">
                           <button className="ccs-filter-btn-sm">Suggested bid for regular days <ChevronDown size={11} /></button>
-                          <span className="ccs-sugg-val">-</span>
+                          <span className="ccs-sugg-val">{addedProducts.length === 0 ? '-' : <>₹{AUTO_DEFAULT_SUGG.sugg.toFixed(2)} <span className="tg-range">(₹{AUTO_DEFAULT_SUGG.min.toFixed(2)}-₹{AUTO_DEFAULT_SUGG.max.toFixed(2)})</span></>}</span>
                         </div>
                         <div className="ccs-bid-field-row">
                           <span className="ccs-bid-label">Default bid</span>
@@ -6430,7 +4282,7 @@ export default function CreateCampaignSetup() {
                               <InfoIcon />
                             </div>
                             <div className="ccs-tg-col-sugg">
-                              {g.on && addedProducts.length > 0 ? (
+                              {addedProducts.length > 0 ? (
                                 <div className="ccs-tg-sugg-block">
                                   <button
                                     className="ccs-tg-sugg-price"
@@ -6442,7 +4294,7 @@ export default function CreateCampaignSetup() {
                                   <span className="ccs-tg-sugg-range">(₹{g.suggMin.toFixed(2)}-₹{g.suggMax.toFixed(2)})</span>
                                 </div>
                               ) : (
-                                <span className="ccs-tg-sugg-blank">–</span>
+                                <span className="ccs-tg-sugg-blank">-</span>
                               )}
                             </div>
                             <div className="ccs-tg-col-bid">
@@ -6475,7 +4327,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card-header">
                 <span className="ccs-card-heading">Manual Targeting <InfoIcon /></span>
                 <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                  <Info size={12} /> Choose keyword or product targeting
+                  <CircleHelp size={13} /> Choose keyword or product targeting
                 </a>
               </div>
               <div className="ccs-card-body">
@@ -6503,7 +4355,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card-header">
                 <span className="ccs-card-heading">Keyword targeting <InfoIcon /></span>
                 <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                  <Info size={12} /> How to add keywords
+                  <CircleHelp size={13} /> How to add keywords
                 </a>
               </div>
               <div className="ccs-kw-layout">
@@ -6511,7 +4363,9 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-kw-left">
                   <div className="ccs-tab-row">
                     {[['suggested','Suggested'],['enter-list','Enter list'],['upload','Upload file']].map(([k, l]) => (
-                      <button key={k} className={`ccs-tab ${kwSugTab === k ? 'active' : ''}`} onClick={() => setKwSugTab(k)}>{l}</button>
+                      <button key={k} className={`ccs-tab ${kwSugTab === k ? 'active' : ''}`} onClick={() => setKwSugTab(k)}>
+                        {l}{k === 'suggested' && <> <InfoIcon /></>}
+                      </button>
                     ))}
                   </div>
 
@@ -6583,61 +4437,66 @@ export default function CreateCampaignSetup() {
                         </div>
                       </div>
 
-                      {/* Keyword groups */}
-                      <div className="ccs-kw-group-section">
-                        <div className="ccs-kw-group-header">
-                          <span>Keyword groups <InfoIcon /> <span className="ccs-beta-badge">Beta</span></span>
-                          <span className="ccs-kw-col-sugg-hd">Sugg. bid <InfoIcon /><br/><span style={{ fontSize: 11, color: '#888' }}>Regular days</span></span>
-                          <button className="link-btn ccs-kw-add-all" onClick={addKwGroup}>Add All</button>
+                      {/* Keyword groups (only once products are added) */}
+                      {hasProducts && <div className="ccs-kw-group-section">
+                        <div className="kwg-hdr kwg-hdr-groups">
+                          <span>Keyword groups <InfoIcon /> <span className="sb-badge">Beta</span></span>
+                          <span>Sugg. bid <InfoIcon /><br/><span className="kwg-sub">Regular days</span></span>
+                          <button className={`kwg-add ${kwGroupAdded ? 'is-done' : ''}`} disabled={kwGroupAdded} onClick={addKwGroup}>Add All</button>
                         </div>
-                        <div className="ccs-kw-group-row">
+                        <div className="kwg-group-row">
                           <span>Keywords related to your product category <InfoIcon /></span>
-                          <span className="ccs-kw-group-sugg">
-                            {kwBidMode === 'suggested'
+                          <span className="kwg-group-sugg">
+                            {addedProducts.length === 0 ? '-' : kwBidMode === 'suggested'
                               ? `₹${KW_GROUP.suggBid.toFixed(2)}`
                               : `₹${KW_GROUP.suggMin.toFixed(2)} - ₹${KW_GROUP.suggMax.toFixed(2)}`}
                           </span>
                           {kwGroupAdded
-                            ? <span className="ccs-kw-added-text">Added</span>
-                            : <button className="link-btn ccs-kw-add-link" onClick={addKwGroup}>Add</button>
-                          }
+                            ? <span className="kwg-added kwg-added-italic">Added</span>
+                            : <button className="kwg-add" onClick={addKwGroup}>Add</button>}
                         </div>
-                      </div>
+                      </div>}
 
                       {/* Individual keyword rows */}
                       <div className="ccs-kw-sugg-table">
-                        <div className="ccs-kw-sugg-hdr">
-                          <span>Keyword<br/><span className="ccs-kw-is-ir">IS | IR <TipIcon tip={TIP_IS_IR} /></span></span>
-                          <span>Match type <TipIcon tip={TIP_MATCH_TYPE} /></span>
-                          <span>Sugg. bid <TipIcon tip={TIP_SUGG_BID} /><br/><span style={{ fontSize: 11, color: '#888' }}>Regular days</span></span>
-                          <button className="link-btn ccs-kw-add-all" onClick={addAllSuggKws}>Add All</button>
+                        <div className="kwg-hdr">
+                          <span>Keyword<br/><span className="kwg-sub">IS | IR <TipIcon tip={TIP_IS_IR} /></span></span>
+                          <span className="kwg-hdr-mid">Match type <TipIcon tip={TIP_MATCH_TYPE} /></span>
+                          <span>Sugg. bid <TipIcon tip={TIP_SUGG_BID} /><br/><span className="kwg-sub">Regular days</span></span>
+                          <button className="kwg-add" onClick={addAllSuggKws}>Add All</button>
                         </div>
-                        {SUGGESTED_KWS.map(s => {
+                        {!hasProducts && (
+                          <div className="tg-empty">
+                            <strong>No related keywords</strong>
+                            <button type="button" className="tg-empty-link" onClick={() => setKwSugTab('enter-list')}>Try entering your own keywords</button>
+                          </div>
+                        )}
+                        {hasProducts && SUGGESTED_KWS.map(s => {
                           const matches = ['broad', 'phrase', 'exact'].filter(m => kwFilters[m]);
+                          if (matches.length === 0) return null;
                           return (
-                            <div key={s.kw} className="ccs-kw-sugg-kw-block">
-                              <div className="ccs-kw-sugg-kw-name">
-                                {s.kw}
-                                <span className="ccs-kw-is-ir-sub">IS: {s.is || 0}{s.ir ? ` | IR: ${s.ir}` : ''}</span>
+                            // Console layout: keyword + IS in the first column, spanning one row per match type.
+                            <div key={s.kw} className="kwg-block">
+                              <div className="kwg-name" style={{ gridRow: `1 / span ${Math.max(1, matches.length)}` }}>
+                                <span>{s.kw}</span>
+                                <span className="kwg-is">IS: {s.is || 0}{s.ir ? ` | IR: ${s.ir}` : ''}</span>
                               </div>
                               {matches.map(m => {
                                 const mt = m.charAt(0).toUpperCase() + m.slice(1);
                                 const kd = s[m];
                                 const isAdded = !!addedKws.find(k => k.type !== 'group' && k.keyword === s.kw && k.matchType === mt);
                                 return (
-                                  <div key={m} className="ccs-kw-sugg-match-row">
-                                    <span />
-                                    <span className={`match-badge match-${m}`}>{mt}</span>
-                                    <span className="ccs-kw-sugg-bid">
+                                  <Fragment key={m}>
+                                    <span className="kwg-mt">{mt}</span>
+                                    <span className="kwg-bid">
                                       {kwBidMode === 'suggested'
                                         ? `₹${kd.sugg.toFixed(2)}`
                                         : `₹${kd.min.toFixed(2)} - ₹${kd.max.toFixed(2)}`}
                                     </span>
                                     {isAdded
-                                      ? <span className="ccs-kw-added-text">Added</span>
-                                      : <button className="link-btn ccs-kw-add-link" onClick={() => addKwFromSugg(s.kw, mt, kd)}>Add</button>
-                                    }
-                                  </div>
+                                      ? <span className="kwg-added">Added</span>
+                                      : <button className="kwg-add" onClick={() => addKwFromSugg(s.kw, mt, kd)}>Add</button>}
+                                  </Fragment>
                                 );
                               })}
                             </div>
@@ -6764,7 +4623,7 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-kw-right">
                   <div className="ccs-added-header">
                     <strong>{addedKws.length} added</strong>
-                    {addedKws.length > 0 && <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedKws([])}>Remove all</button>}
+                    <button className="link-btn tg-remove-all" disabled={addedKws.length === 0} onClick={() => setAddedKws([])}>Remove all</button>
                   </div>
                   <div className="ccs-kw-right-head">
                     <span>Keyword<br/><span className="ccs-kw-is-ir">IS | IR <TipIcon tip={TIP_IS_IR} /></span></span>
@@ -6778,13 +4637,14 @@ export default function CreateCampaignSetup() {
                     <span>Bid <TipIcon tip={TIP_BID} /></span>
                   </div>
                   {addedKws.length === 0 ? (
-                    <div className="ccs-kw-right-empty">No keywords added yet</div>
+                    <div className="ccs-kw-right-empty" />
                   ) : (
                     addedKws.map((k, i) => (
                       <div key={i} className="ccs-kw-right-row">
                         <div>
                           <div style={{ fontSize: 13 }}>{k.type === 'group' ? k.name : k.keyword}</div>
                           {k.type === 'group' && <div style={{ fontSize: 11, color: '#888' }}>Keyword group</div>}
+                          {!validBid(k.bid) && <div className="sb-error sb-error-inline">! {k.bid === '' ? 'Enter a bid' : 'Bid must be at least ₹1.00'}</div>}
                         </div>
                         <div>
                           {k.matchType
@@ -6793,7 +4653,7 @@ export default function CreateCampaignSetup() {
                           }
                         </div>
                         <div style={{ fontSize: 12 }}>
-                          {k.suggBid != null ? (
+                          {k.type === 'group' && !hasProducts ? <span style={{ color: '#767676' }}>-</span> : k.suggBid != null ? (
                             <>
                               <button className="link-btn" style={{ color: '#0066c0', fontWeight: 500, fontSize: 13 }}
                                 onClick={() => setAddedKws(p => p.map((x, j) => j === i ? { ...x, bid: x.suggBid.toFixed(2) } : x))}>
@@ -6811,13 +4671,14 @@ export default function CreateCampaignSetup() {
                                 onChange={e => { const v = parseFloat(e.target.value); setAddedKws(p => p.map((x, j) => j === i ? { ...x, bid: v < 0 ? '0' : e.target.value } : x)); }}
                                 min="0" style={{ width: 65 }} />
                             </div>
-                            <button className="ccs-remove-btn" onClick={() => setAddedKws(p => p.filter((_, j) => j !== i))}>×</button>
+                            <button className="ccs-remove-btn" onClick={() => { if (k.type === 'group') setKwGroupDismissed(true); setAddedKws(p => p.filter((_, j) => j !== i)); }}>×</button>
                           </div>
                           {k.isDefaultBid && <span style={{ fontSize: 11, color: '#888' }}>Default bid</span>}
                         </div>
                       </div>
                     ))
                   )}
+                  {kwListHasErrors && <div className="sb-list-error">! You have one or more errors in this list</div>}
                 </div>
               </div>
             </div>
@@ -6829,7 +4690,7 @@ export default function CreateCampaignSetup() {
               <div className="ccs-card-header">
                 <span className="ccs-card-heading">Product Targeting <InfoIcon /></span>
                 <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                  <Info size={12} /> How to use product targeting
+                  <CircleHelp size={13} /> How to use product targeting
                 </a>
               </div>
               <div className="ccs-kw-layout">
@@ -6892,8 +4753,9 @@ export default function CreateCampaignSetup() {
 
                       {ptCatTab === 'suggested' && (
                         addedProducts.length === 0 ? (
-                          <div style={{ padding: '24px 16px', color: '#888', fontSize: 13, textAlign: 'center' }}>
-                            Add at least one product above to see suggested categories.
+                          <div className="tg-empty">
+                            <strong>No relevant categories available</strong>
+                            <button type="button" className="tg-empty-link" onClick={() => setPtCatTab('search')}>Try searching for categories</button>
                           </div>
                         ) : (
                           <div>
@@ -7016,7 +4878,10 @@ export default function CreateCampaignSetup() {
                       {/* SUGGESTED */}
                       {ptIndivSubTab === 'suggested' && (
                         addedProducts.length === 0 ? (
-                          <div style={{ padding: '24px 16px', color: '#888', fontSize: 13, textAlign: 'center' }}>Add at least one product above to see suggestions.</div>
+                          <div className="tg-empty">
+                            <strong>No suggestions available.</strong>
+                            <button type="button" className="tg-empty-link" onClick={() => setPtIndivSubTab('search')}>Try searching for products.</button>
+                          </div>
                         ) : (
                           <div>
                             <div className="ccs-indiv-list-hdr">
@@ -7032,55 +4897,7 @@ export default function CreateCampaignSetup() {
                             </div>
                             <div className="ccs-indiv-list">
                               {INDIV_SUGGESTED.map(p => (
-                                <div key={p.id} className="ccs-indiv-product-block">
-                                  {/* Product info row */}
-                                  <div className="ccs-indiv-product-info">
-                                    <div style={{ width: 56, height: 56, borderRadius: 4, overflow: 'hidden', flexShrink: 0, border: '1px solid #e8e8e8' }}>
-                                      {getIndivImage(p)}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 13, color: '#0073bb', fontWeight: 500, marginBottom: 2, cursor: 'pointer', lineHeight: 1.4 }}>{p.name.length > 80 ? p.name.slice(0, 80) + '…' : p.name}</div>
-                                      <div style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>{p.format}</div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                                        {renderStars(p.stars)}
-                                        <span style={{ fontSize: 12, color: '#0073bb' }}>({p.reviews.toLocaleString('en-IN')})</span>
-                                      </div>
-                                      {p.originalPrice && <div style={{ fontSize: 12 }}><s style={{ color: '#888' }}>₹{p.originalPrice.toLocaleString('en-IN')}</s> <span style={{ color: '#b12704', fontWeight: 600 }}>₹{p.price.toLocaleString('en-IN')}</span></div>}
-                                      <div style={{ fontSize: 12, color: p.status === 'In stock' ? '#007600' : '#c40000', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.status === 'In stock' ? '#007600' : '#c40000', flexShrink: 0, display: 'inline-block' }} />
-                                        {p.status}
-                                      </div>
-                                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>ASIN: {p.asin}</div>
-                                    </div>
-                                  </div>
-                                  {/* Type rows */}
-                                  {ptIndivFilterExact && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span />
-                                      <span style={{ fontSize: 13, color: '#555' }}>{p.sugg ? `₹${p.sugg.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Exact</span>
-                                      <div>
-                                        {addedProdTargets.find(t => t.id === `indiv-${p.id}-exact`)
-                                          ? <span className="ccs-kw-added-text">Added</span>
-                                          : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, prodMin: 1, prodMax: 1, brands: [], bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact' })}>Add</button>
-                                        }
-                                      </div>
-                                    </div>
-                                  )}
-                                  {ptIndivFilterExpanded && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span />
-                                      <span style={{ fontSize: 13, color: '#555' }}>{p.suggExpanded ? `₹${p.suggExpanded.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Expanded</span>
-                                      <div>
-                                        {addedProdTargets.find(t => t.id === `indiv-${p.id}-expanded`)
-                                          ? <span className="ccs-kw-added-text">Added</span>
-                                          : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, prodMin: 1, prodMax: 1, brands: [], bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded' })}>Add</button>
-                                        }
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                                <IndivProductRow key={p.id} product={p} image={getIndivImage(p)} types={[ptIndivFilterExact && 'Exact', ptIndivFilterExpanded && 'Expanded'].filter(Boolean)} isAdded={(t) => !!addedProdTargets.find(x => x.id === `indiv-${p.id}-${t.toLowerCase()}`)} onAdd={(t) => addProdTarget(t === 'Exact' ? { id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] } : { id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })} />
                               ))}
                             </div>
                           </div>
@@ -7099,32 +4916,7 @@ export default function CreateCampaignSetup() {
                           {ptIndivSearch && (
                             <div className="ccs-indiv-list">
                               {INDIV_SUGGESTED.filter(p => p.name.toLowerCase().includes(ptIndivSearch.toLowerCase()) || p.asin.toLowerCase().includes(ptIndivSearch.toLowerCase())).map(p => (
-                                <div key={p.id} className="ccs-indiv-product-block">
-                                  <div className="ccs-indiv-product-info">
-                                    <div style={{ width: 56, height: 56, borderRadius: 4, overflow: 'hidden', flexShrink: 0, border: '1px solid #e8e8e8' }}>{getIndivImage(p)}</div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 13, color: '#0073bb', fontWeight: 500, marginBottom: 2, lineHeight: 1.4 }}>{p.name.length > 80 ? p.name.slice(0, 80) + '…' : p.name}</div>
-                                      <div style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>{p.format}</div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>{renderStars(p.stars)}<span style={{ fontSize: 12, color: '#0073bb' }}>({p.reviews.toLocaleString('en-IN')})</span></div>
-                                      <div style={{ fontSize: 12 }}><s style={{ color: '#888' }}>₹{p.originalPrice?.toLocaleString('en-IN')}</s> <span style={{ color: '#b12704', fontWeight: 600 }}>₹{p.price.toLocaleString('en-IN')}</span></div>
-                                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>ASIN: {p.asin}</div>
-                                    </div>
-                                  </div>
-                                  {ptIndivFilterExact && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span /><span style={{ fontSize: 13, color: '#555' }}>{p.sugg ? `₹${p.sugg.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Exact</span>
-                                      <div>{addedProdTargets.find(t => t.id === `indiv-${p.id}-exact`) ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] })}>Add</button>}</div>
-                                    </div>
-                                  )}
-                                  {ptIndivFilterExpanded && (
-                                    <div className="ccs-indiv-type-row">
-                                      <span /><span style={{ fontSize: 13, color: '#555' }}>{p.suggExpanded ? `₹${p.suggExpanded.toFixed(2)}` : '-'}</span>
-                                      <span style={{ fontSize: 13 }}>Expanded</span>
-                                      <div>{addedProdTargets.find(t => t.id === `indiv-${p.id}-expanded`) ? <span className="ccs-kw-added-text">Added</span> : <button className="link-btn ccs-kw-add-link" onClick={() => addProdTarget({ id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })}>Add</button>}</div>
-                                    </div>
-                                  )}
-                                </div>
+                                <IndivProductRow key={p.id} product={p} image={getIndivImage(p)} types={[ptIndivFilterExact && 'Exact', ptIndivFilterExpanded && 'Expanded'].filter(Boolean)} isAdded={(t) => !!addedProdTargets.find(x => x.id === `indiv-${p.id}-${t.toLowerCase()}`)} onAdd={(t) => addProdTarget(t === 'Exact' ? { id: `indiv-${p.id}-exact`, name: p.name.slice(0, 50), sugg: p.sugg, bid: p.sugg ? p.sugg.toFixed(2) : '3.00', type: 'Exact', brands: [] } : { id: `indiv-${p.id}-expanded`, name: p.name.slice(0, 50), sugg: p.suggExpanded || null, bid: p.suggExpanded ? p.suggExpanded.toFixed(2) : '3.00', type: 'Expanded', brands: [] })} />
                               ))}
                               {INDIV_SUGGESTED.filter(p => p.name.toLowerCase().includes(ptIndivSearch.toLowerCase()) || p.asin.toLowerCase().includes(ptIndivSearch.toLowerCase())).length === 0 && (
                                 <div style={{ padding: '20px 0', color: '#888', fontSize: 13, textAlign: 'center' }}>No products found for "{ptIndivSearch}".</div>
@@ -7372,7 +5164,7 @@ export default function CreateCampaignSetup() {
                 <div className="ccs-kw-right">
                   <div className="ccs-added-header">
                     <strong>{addedProdTargets.length} added</strong>
-                    {addedProdTargets.length > 0 && <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedProdTargets([])}>Remove all</button>}
+                    <button className="link-btn tg-remove-all" disabled={addedProdTargets.length === 0} onClick={() => setAddedProdTargets([])}>Remove all</button>
                   </div>
                   <div className="ccs-pt-right-head">
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Categories and products</span>
@@ -7380,7 +5172,7 @@ export default function CreateCampaignSetup() {
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>Bid</span>
                   </div>
                   {addedProdTargets.length === 0 ? (
-                    <div className="ccs-kw-right-empty">No targets added yet</div>
+                    <div className="ccs-kw-right-empty" />
                   ) : (
                     addedProdTargets.map((t, i) => (
                       <div key={i} className="ccs-pt-right-row">
@@ -7406,141 +5198,15 @@ export default function CreateCampaignSetup() {
             </div>
           )}
 
-          {/* ══ NEGATIVE KEYWORD TARGETING ══ */}
-          <div className="ccs-card ccs-collapsible">
-            <button className="ccs-collapsible-header" onClick={() => setNegKwOpen(o => !o)}>
-              <div className="ccs-collapsible-left">
-                {negKwOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span className="ccs-card-heading">Negative keyword targeting <InfoIcon /></span>
-                <span className="ccs-optional-tag">optional</span>
-              </div>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to use negative keywords
-              </a>
-            </button>
-            {negKwOpen && (
-              <div className="ccs-products-layout" style={{ borderTop: '1px solid var(--amazon-border)' }}>
-                <div className="ccs-products-left">
-                  <div className="ccs-card-body">
-                    <div className="ccs-match-label" style={{ marginBottom: 8 }}>Match type <InfoIcon /></div>
-                    <div className="ccs-neg-match-row">
-                      {['Negative exact','Negative phrase'].map(m => (
-                        <label key={m} className="ccs-radio-inline">
-                          <input type="radio" name="negMatch" checked={negKwMatchType===m} onChange={() => setNegKwMatchType(m)} />
-                          {m}
-                        </label>
-                      ))}
-                    </div>
-                    <textarea className="ccs-textarea" rows={6} value={negKwText}
-                      onChange={e => setNegKwText(e.target.value)}
-                      placeholder="Enter keywords separated by new line." />
-                    <div style={{ textAlign: 'right', marginTop: 8 }}>
-                      <button className="btn btn-secondary" onClick={addNegKws} disabled={!negKwText.trim()}>Add keywords</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="ccs-products-right">
-                  <div className="ccs-added-header">
-                    <strong>{addedNegKws.length} added</strong>
-                    {addedNegKws.length > 0 && <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedNegKws([])}>Remove all</button>}
-                  </div>
-                  {addedNegKws.length === 0 ? (
-                    <div className="ccs-added-empty" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: '12px 14px' }}>
-                      <span>Keyword</span>
-                      <span style={{ color: '#aaa' }}>Match type</span>
-                    </div>
-                  ) : (
-                    <table className="ccs-kw-table">
-                      <thead><tr><th>Keyword</th><th>Match type</th><th></th></tr></thead>
-                      <tbody>
-                        {addedNegKws.map((k, i) => (
-                          <tr key={i}>
-                            <td>{k.keyword}</td>
-                            <td>{k.matchType}</td>
-                            <td><button className="ccs-remove-btn" onClick={() => setAddedNegKws(p => p.filter((_,j)=>j!==i))}>×</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ══ NEGATIVE PRODUCT TARGETING ══ */}
-          <div className="ccs-card ccs-collapsible">
-            <button className="ccs-collapsible-header" onClick={() => setNegProdOpen(o => !o)}>
-              <div className="ccs-collapsible-left">
-                {negProdOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span className="ccs-card-heading">Negative product targeting <InfoIcon /></span>
-                <span className="ccs-optional-tag">optional</span>
-              </div>
-              <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to choose negative products for targeting
-              </a>
-            </button>
-            {negProdOpen && (
-              <div className="ccs-products-layout" style={{ borderTop: '1px solid var(--amazon-border)' }}>
-                <div className="ccs-products-left">
-                  <div className="ccs-tab-row">
-                    <button className={`ccs-tab ${negProdTab==='brands'?'active':''}`} onClick={() => setNegProdTab('brands')}>
-                      <strong>Exclude brands</strong> <InfoIcon />
-                    </button>
-                    <button className={`ccs-tab ${negProdTab==='products'?'active':''}`} onClick={() => setNegProdTab('products')}>
-                      Exclude products <InfoIcon />
-                    </button>
-                  </div>
-                  <div className="ccs-card-body">
-                    {negProdTab === 'brands' ? (
-                      <>
-                        <div className="ccs-search-wrap" style={{ marginBottom: 12 }}>
-                          <Search size={13} className="ccs-search-icon" />
-                          <input className="ccs-search-input" placeholder="Search by brand name" />
-                        </div>
-                        <div className="ccs-brand-section">
-                          <div className="ccs-brand-section-header">
-                            <strong>YOUR BRANDS</strong>
-                            <button className="link-btn ccs-exclude-all">Exclude all</button>
-                          </div>
-                          <div className="ccs-brand-row">
-                            <span>SoundMax</span>
-                            <button className="link-btn ccs-exclude-btn"
-                              onClick={() => !addedNegProds.find(x => x.name==='SoundMax') && setAddedNegProds(p => [...p, { type: 'brand', name: 'SoundMax' }])}>
-                              Exclude
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="ccs-search-wrap" style={{ marginBottom: 12 }}>
-                        <Search size={13} className="ccs-search-icon" />
-                        <input className="ccs-search-input" placeholder="Search by product name or ASIN" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="ccs-products-right">
-                  <div className="ccs-added-header">
-                    <strong>{addedNegProds.length} added</strong>
-                    {addedNegProds.length > 0 && <button className="link-btn" style={{ fontSize: 12 }} onClick={() => setAddedNegProds([])}>Remove all</button>}
-                  </div>
-                  {addedNegProds.length === 0 ? (
-                    <div className="ccs-added-empty">Brands and products</div>
-                  ) : (
-                    <div className="ccs-added-list">
-                      {addedNegProds.map((p, i) => (
-                        <div key={i} className="ccs-added-item">
-                          <span>{p.name}</span>
-                          <button className="ccs-remove-btn" onClick={() => setAddedNegProds(x => x.filter((_,j)=>j!==i))}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* ══ NEGATIVE KEYWORD / PRODUCT TARGETING ══ */}
+          <NegativeCards
+            negKeywords={spNegKws}
+            onNegKeywords={setSpNegKws}
+            negProducts={spNegProds}
+            onNegProducts={setSpNegProds}
+            ownBrand={allProducts[0]?.brand || 'SoundMax'}
+            searchableProducts={[...allProducts, ...INDIV_SUGGESTED.map(p => ({ asin: p.asin, name: p.name }))]}
+          />
 
           {/* ══ CAMPAIGN ══ */}
           <div className="ccs-section-title">Campaign</div>
@@ -7550,7 +5216,7 @@ export default function CreateCampaignSetup() {
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Campaign bidding strategy <InfoIcon /></span>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to set your bid strategy
+                <CircleHelp size={13} /> How to set your bid strategy
               </a>
             </div>
             {adGroupMode ? (
@@ -7588,93 +5254,78 @@ export default function CreateCampaignSetup() {
               <div className="ccs-bid-adj-heading">Bid adjustments</div>
               <p className="ccs-radio-desc" style={{ margin: '4px 0 12px' }}>By raising your bids, you will be more likely to appear in specific placements and in front of specific audiences.</p>
               <div className="ccs-tab-row">
-                <button className={`ccs-tab ${placementTab==='placements'?'active':''}`} onClick={() => setPlacementTab('placements')}>Placements</button>
+                <button className={`ccs-tab ${placementTab==='placements'?'active':''}`} onClick={() => setPlacementTab('placements')}>
+                  Placements{adGroupMode && activePlacementCount > 0 && <span className="sb-tab-count">{activePlacementCount}</span>}
+                </button>
                 <button className={`ccs-tab ${placementTab==='audiences'?'active':''}`} onClick={() => setPlacementTab('audiences')}>
                   Audiences <span className="ccs-new-badge">New</span>
                 </button>
               </div>
             </div>
-            {placementTab === 'placements' && (
-              <div className="ccs-bid-adj-body">
-                <div className="ccs-bid-adj-left">
-                  <p className="ccs-radio-desc" style={{ marginBottom: 14 }}>Increase your bid for specific Amazon placements. <InfoIcon /></p>
-                  {[
-                    { label: 'Top of search (first page)', val: placementTop,  set: setPlacementTop },
-                    { label: 'Rest of search',             val: placementRest, set: setPlacementRest },
-                    { label: 'Product pages',              val: placementPages,set: setPlacementPages },
-                  ].map(pl => (
-                    <div key={pl.label} className="ccs-placement-inline-row">
-                      <span className="ccs-placement-label">{pl.label}</span>
-                      <div className="ccs-pct-input-wrap">
-                        <input type="number" className="ccs-pct-input" value={pl.val}
-                          min="0" max="900"
-                          onChange={e => {
-                            const v = Math.min(900, Math.max(0, parseInt(e.target.value) || 0));
-                            pl.set(v.toString());
-                          }} />
-                        <span className="ccs-pct-sign">%</span>
+            <div className="ccs-bid-adj-body">
+              <div className="ccs-bid-adj-left">
+                {placementTab === 'placements' && (
+                  <>
+                    <p className="ccs-radio-desc" style={{ marginBottom: 14 }}>
+                      {isBusinessSite ? 'Increase your bid for specific Amazon Business placements.' : 'Increase your bid for specific Amazon placements.'} <InfoIcon />
+                    </p>
+                    {effectivePlacements.map(pl => (
+                      <div key={pl.key} className="ccs-placement-inline-row">
+                        <span className="ccs-placement-label">{pl.label}</span>
+                        {adGroupMode ? (
+                          <span className="sb-readonly-pct">{pl.val}%</span>
+                        ) : (
+                          <div className="ccs-pct-input-wrap">
+                            <input type="number" className="ccs-pct-input" value={pl.val} min="0" max="900"
+                              onChange={e => pl.set(String(Math.min(900, Math.max(0, parseInt(e.target.value) || 0))))} />
+                            <span className="ccs-pct-sign">%</span>
+                          </div>
+                        )}
                       </div>
-                      {parseInt(pl.val) > 0 && <span style={{ fontSize: 12, color: '#888', marginLeft: 6 }}>max 900%</span>}
-                    </div>
-                  ))}
-                  <p className="ccs-placement-summary">
-                    A ₹{parseFloat(defaultBid||0).toFixed(2)} bid will start at ₹{(parseFloat(defaultBid||0)*(1+parseFloat(placementTop||0)/100)).toFixed(2)} for top of search,{' '}
-                    ₹{(parseFloat(defaultBid||0)*(1+parseFloat(placementRest||0)/100)).toFixed(2)} for rest of search, and{' '}
-                    ₹{(parseFloat(defaultBid||0)*(1+parseFloat(placementPages||0)/100)).toFixed(2)} for product pages.{' '}
-                    {biddingStrategy === 'Dynamic bids - up and down' && 'Dynamic bidding may increase your bids by up to 100% on all placements.'}
-                  </p>
-                  <label className="ccs-biz-check-row">
-                    <input type="checkbox" checked={bizCheck} onChange={e => setBizCheck(e.target.checked)} />
-                    <span>Further increase bids across placements on Amazon Business <InfoIcon /></span>
-                  </label>
-                  {bizCheck && (
-                    <div className="ccs-biz-tip">
-                      <span className="ccs-biz-tip-icon">💡</span>
-                      <span>On average, advertisers see a 2x to 3x higher return on ad spending on Amazon Business relative to the overall campaign performance (Amazon internal data, 2024).</span>
-                    </div>
-                  )}
-                </div>
-                <div className="ccs-bid-adj-right">
-                  {effectiveBiddingStrategy !== '' && (
-                    <div className="ccs-adj-summary-card">
-                      <div className="ccs-adj-summary-header">
-                        <ChevronDown size={14} />
-                        <span className="ccs-adj-count">1 adjustment applied</span>
-                      </div>
-                      <div className="ccs-adj-row-label">BIDDING STRATEGY</div>
-                      <div className="ccs-adj-row-val">{effectiveBiddingStrategy}</div>
-                    </div>
-                  )}
-                </div>
+                    ))}
+                    <p className="ccs-placement-summary">{placementExample}</p>
+                    {!isBusinessSite && !adGroupMode && (
+                      <>
+                        <label className="ccs-biz-check-row">
+                          <input type="checkbox" checked={bizCheck} onChange={e => setBizCheck(e.target.checked)} />
+                          <span>Further increase bids across placements on Amazon Business <InfoIcon /></span>
+                        </label>
+                        <div className="ccs-biz-tip">
+                          <span className="ccs-biz-tip-icon">💡</span>
+                          <span>On average, advertisers see a 2x to 3x higher return on ad spending on Amazon Business relative to the overall campaign performance (Amazon internal data, 2024).</span>
+                        </div>
+                      </>
+                    )}
+                    {adGroupMode && !isBusinessSite && (
+                      <>
+                        <p className="sb-subhead">Further increase bids across placements on Amazon Business</p>
+                        <div className="ccs-placement-inline-row">
+                          <span className="ccs-placement-label">Amazon Business placements</span>
+                          <span className="sb-readonly-pct">{parentCampaign?.placementAdjustments?.business || 0}%</span>
+                        </div>
+                        <p className="ccs-placement-summary">{placementExample}</p>
+                      </>
+                    )}
+                  </>
+                )}
+                {placementTab === 'audiences' && (
+                  <AudienceAdjustments
+                    value={adGroupMode ? (parentCampaign?.audienceAdjustment || { mode: 'none' }) : audienceAdj}
+                    onChange={setAudienceAdj}
+                    baseBid={parseFloat(defaultBid) || 0}
+                    strategy={effectiveBiddingStrategy}
+                    isReadOnly={adGroupMode}
+                  />
+                )}
               </div>
-            )}
-            {placementTab === 'audiences' && (
-              <div className="ccs-bid-adj-body">
-                <div className="ccs-bid-adj-left">
-                  {[
-                    { key: 'increase', label: 'Increase bids for audiences built by Amazon' },
-                    { key: 'none',     label: 'Do not increase bids for an audience' },
-                  ].map(opt => (
-                    <label key={opt.key} className="ccs-radio-row" style={{ marginBottom: 10 }}>
-                      <input type="radio" name="audienceBid" defaultChecked={opt.key === 'none'} />
-                      <span className="ccs-radio-label">{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="ccs-bid-adj-right">
-                  {effectiveBiddingStrategy !== '' && (
-                    <div className="ccs-adj-summary-card">
-                      <div className="ccs-adj-summary-header">
-                        <ChevronDown size={14} />
-                        <span className="ccs-adj-count">1 adjustment applied</span>
-                      </div>
-                      <div className="ccs-adj-row-label">BIDDING STRATEGY</div>
-                      <div className="ccs-adj-row-val">{effectiveBiddingStrategy}</div>
-                    </div>
-                  )}
-                </div>
+              <div className="ccs-bid-adj-right">
+                <AdjustmentSummary
+                  placements={Object.fromEntries(effectivePlacements.map(pl => [pl.key, pl.val]))}
+                  strategy={effectiveBiddingStrategy}
+                  audience={adGroupMode ? parentCampaign?.audienceAdjustment : audienceAdj}
+                />
               </div>
-            )}
+            </div>
           </div>
 
           {/* Settings — hidden in ad group mode */}
@@ -7682,7 +5333,7 @@ export default function CreateCampaignSetup() {
             <div className="ccs-card-header">
               <span className="ccs-card-heading">Settings</span>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> How to set up your campaign
+                <CircleHelp size={13} /> How to set up your campaign
               </a>
             </div>
             <div className="ccs-card-body">
@@ -7706,19 +5357,11 @@ export default function CreateCampaignSetup() {
               <div className="ccs-date-row" style={{ marginTop: 14 }}>
                 <div className="ccs-field">
                   <label className="ccs-label">Start <InfoIcon /></label>
-                  <div className="ccs-date-input-wrap">
-                    <span className="ccs-date-icon">📅</span>
-                    <input type="date" className="ccs-date-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                  </div>
+                  <DateField value={startDate} onChange={setStartDate} min={today} />
                 </div>
                 <div className="ccs-field">
                   <label className="ccs-label">End <InfoIcon /></label>
-                  <div className="ccs-date-input-wrap">
-                    <span className="ccs-date-icon">📅</span>
-                    <input type="date" className="ccs-date-input" value={endDate} onChange={e => setEndDate(e.target.value)}
-                      placeholder="No end date" />
-                    {!endDate && <span className="ccs-no-end">No end date</span>}
-                  </div>
+                  <DateField value={endDate} onChange={setEndDate} min={startDate} isClearable placeholder="No end date" />
                 </div>
               </div>
               <div className="ccs-field" style={{ marginTop: 14 }}>
@@ -7732,8 +5375,17 @@ export default function CreateCampaignSetup() {
                   <input type="number" className="ccs-bid-input" value={budget}
                     onChange={e => { const v = parseFloat(e.target.value); setBudget(v < 0 ? '0' : e.target.value); }} min="0" style={{ width: 140 }} />
                 </div>
-                <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>Minimum ₹50 per day</small>
               </div>
+              {!isBusinessSite && targetingType === 'Auto' && (
+                <label className="sb-check" style={{ marginTop: 14 }}>
+                  <input type="checkbox" checked={extraCountry} onChange={e => setExtraCountry(e.target.checked)} />
+                  <span>
+                    <strong>Launch your campaign in 1 additional country <span className="sb-badge">Beta</span></strong>
+                    <a href="#global" className="sb-help" onClick={e => e.preventDefault()}>Learn about global campaigns</a>
+                    <small>For each country, we will add your eligible matching products and optimise keywords, bids, and budgets to help drive traffic.</small>
+                  </span>
+                </label>
+              )}
             </div>
           </div>}
 
@@ -7750,7 +5402,7 @@ export default function CreateCampaignSetup() {
                 <span className="ccs-optional-tag">optional</span>
               </div>
               <a href="#" className="ccs-help-link" onClick={e => e.preventDefault()}>
-                <Info size={12} /> Learn about automatic rules
+                <CircleHelp size={13} /> Learn about automatic rules
               </a>
             </button>
             {rulesOpen && (
@@ -7794,12 +5446,13 @@ export default function CreateCampaignSetup() {
             )}
           </div>
           </>}
+          </>}
 
           {/* Bottom launch */}
           <div className="ccs-bottom-bar">
             <div />
             <div style={{ display: 'flex', gap: 10 }}>
-              {!adGroupMode && <button className="btn btn-secondary" onClick={() => navigate('/create-campaign')}>Save as draft</button>}
+              {!adGroupMode && <button className="btn btn-secondary" onClick={() => navigate('/cb')}>Save as draft</button>}
               <button className="btn btn-dark" onClick={handleLaunch}>{adGroupMode ? 'Create ad group' : 'Launch campaign'}</button>
             </div>
           </div>
@@ -7815,47 +5468,12 @@ export default function CreateCampaignSetup() {
 
         </div>{/* end ccs-main */}
 
-        {/* ── FORECAST SIDEBAR ── */}
-        <div className="ccs-sidebar">
-          <div className="ccs-forecast-card">
-            <div className="ccs-forecast-title">
-              Forecast <InfoIcon />
-              <span className="ccs-beta-badge">Beta</span>
-            </div>
-            <p className="ccs-forecast-desc">Estimates of performance are based on historical campaigns with similar targeting and bids.</p>
-            <a href="#" className="ccs-help-link" onClick={e=>e.preventDefault()}><Info size={12} /> Learn about forecasts</a>
-            <div style={{ marginTop: 14 }}>
-              <button className="ccs-filter-btn-sm">Weekly <ChevronDown size={11} /></button>
-            </div>
-            <div className="ccs-forecast-row"><span>Cost type: CPC</span></div>
-            <div className="ccs-forecast-metric">
-              <span>Clicks <InfoIcon /></span>
-              <span>–</span>
-            </div>
-            <div className="ccs-forecast-metric">
-              <span>Orders <InfoIcon /></span>
-              <span>–</span>
-            </div>
-            {addedProducts.length > 0 && addedKws.length === 0 && targetingType === 'Auto' ? (
-              <div className="ccs-forecast-hint">
-                <p>To see a forecast:</p>
-                <ul>
-                  <li>Add targets</li>
-                  <li>Enter a bid</li>
-                </ul>
-              </div>
-            ) : addedProducts.length === 0 ? (
-              <div className="ccs-forecast-hint">
-                <p>To see a forecast:</p>
-                <ul>
-                  <li>Choose products</li>
-                  <li>Add targets</li>
-                  <li>Enter a bid</li>
-                </ul>
-              </div>
-            ) : null}
+        {/* ── FORECAST SIDEBAR (not shown when adding an ad group) ── */}
+        {!adGroupMode && (
+          <div className="ccs-sidebar">
+            <ForecastPanel forecast={forecast} period={forecastPeriod} onPeriod={setForecastPeriod} />
           </div>
-        </div>
+        )}
 
       </div>{/* end ccs-body */}
 

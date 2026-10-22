@@ -1,11 +1,3 @@
-export const generatePerformanceData = () => ({
-  impressions: Math.floor(Math.random() * 50),
-  clicks: Math.floor(Math.random() * 3),
-  spend: parseFloat((Math.random() * 0.5).toFixed(2)),
-  orders: Math.random() > 0.8 ? 1 : 0,
-  sales: Math.random() > 0.8 ? parseFloat((20 + Math.random() * 80).toFixed(2)) : 0,
-});
-
 export const simulateAuction = (keyword, competitors) => {
   const qualityScore = parseFloat((6 + Math.random() * 4).toFixed(1));
   const myScore = keyword.bid * (qualityScore / 10);
@@ -65,6 +57,7 @@ export const getBidRecommendations = (keywords) =>
     estimatedImpressions: Math.floor(1000 + Math.random() * 5000),
   }));
 
-export const formatCurrency = (val) => `₹${Number(val || 0).toFixed(2)}`;
-export const formatNumber = (val) => Number(val || 0).toLocaleString();
+export const formatCurrency = (val) =>
+  `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const formatNumber = (val) => Number(val || 0).toLocaleString('en-IN');
 export const formatPercent = (val) => `${Number(val || 0).toFixed(2)}%`;
