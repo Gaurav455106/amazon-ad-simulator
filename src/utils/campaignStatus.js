@@ -26,3 +26,16 @@ export const STATUS_TONE = {
   Ended: '',
   Scheduled: '',
 };
+
+/**
+ * Status and reason for an ad, checked from the top of the hierarchy down, as the console does.
+ * @returns {{ status: string, reason: string }}
+ */
+export function adStatus({ campaign, adGroup, isOn, product, pendingReview }) {
+  if (campaign.status !== 'Enabled') return { status: 'Paused', reason: 'You paused this campaign.' };
+  if (adGroup.status !== 'Enabled') return { status: 'Paused', reason: 'You paused this ad group.' };
+  if (!isOn) return { status: 'Paused', reason: 'You paused this ad.' };
+  if (product?.status === 'Out of stock') return { status: 'Out of stock', reason: 'This product is out of stock, so the ad is not showing.' };
+  if (pendingReview) return { status: 'Delivering', reason: 'An updated version is in review. The approved version keeps running until then.' };
+  return { status: 'Delivering', reason: 'Your ad is eligible to show.' };
+}

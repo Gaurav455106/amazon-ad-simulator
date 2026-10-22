@@ -10,6 +10,7 @@ import { statusBulkSection } from '../../../components/console/table/bulkActions
 import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
 import { DEFAULT_STATUS_FILTER, statusField, numberField } from '../../../components/console/table/tableFilters';
 import { effectiveCpc } from '../../builder/sd/launch';
+import { sbAdsFor } from '../../adgroups/sbAds';
 
 // Default metric columns per campaign type, as the console shows them; the rest are in "Customise columns".
 const DEFAULT_METRICS = {
@@ -87,7 +88,8 @@ export default function AdGroupsTab({ campaign }) {
       if (isAuto) return AUTO_TARGET_GROUPS;
       return keywords.filter(k => k.adGroupId === ag.id).length;
     };
-    const sbAdName = (ag) => sbAds.find(a => a.campaignId === campaign.id)?.name || campaign.sbCreative?.headline || ag.name;
+    const adCount = (ag) => (isSB ? sbAdsFor(campaign, ag, sbAds).length : (ag.products || []).length);
+    const sbAdName = (ag) => sbAdsFor(campaign, ag, sbAds)[0]?.name || ag.name;
     return [
       { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.ag.status,
         cell: ({ ag }) => <ActiveSwitch isOn={ag.status === 'Enabled'} disabled={ag.status === 'Archived'} onToggle={() => updateAdGroup(ag.id, { status: ag.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
@@ -102,8 +104,8 @@ export default function AdGroupsTab({ campaign }) {
         cell: ({ ag }) => (isSD ? <CostControlCell campaign={campaign} /> : <BidCell adGroup={ag} />) }] : []),
       { key: 'targets', label: isSB ? 'Targets' : 'Total targets', group: GROUPS.detail, num: true, info: true, csv: r => targetCount(r.ag), sortValue: r => targetCount(r.ag),
         cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id, 'targeting')}>{targetCount(ag)}</Link> },
-      ...(!isSB ? [{ key: 'products', label: isSD ? 'Ads' : 'Products', group: GROUPS.detail, num: true, info: true, csv: r => (r.ag.products || []).length,
-        sortValue: r => (r.ag.products || []).length, cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id, 'ads')}>{(ag.products || []).length}</Link> }] : []),
+      { key: 'products', label: isSB || isSD ? 'Ads' : 'Products', group: GROUPS.detail, num: true, info: true, csv: r => adCount(r.ag), sortValue: r => adCount(r.ag),
+        cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id, 'ads')}>{adCount(ag)}</Link> },
       ...metricColumns([...defaults, ...ALL_METRICS.filter(k => !defaults.includes(k))], defaults),
     ];
   }, [campaign, isSB, isSD, isAuto, keywords, sbAds, defaults, updateAdGroup]);

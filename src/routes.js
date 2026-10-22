@@ -112,3 +112,6 @@ export const AD_GROUP_TABS = {
     { key: 'creative', label: 'Creative' },
   ],
 };
+
+/** "Create ad" on a Sponsored Brands ad group opens the full-page "New Ad" builder. */
+export const newSbAdPath = (campaign, adGroupId) => `/cb/sb/adGroups/${adGroupId}/ads?campaignId=${campaign.id}`;

@@ -6,7 +6,7 @@ import CmSubNav from './shell/CmSubNav';
 import UserSwitchModal from './shell/UserSwitchModal';
 
 // Campaign builder pages take over the whole window, like the real "× New campaign" screen.
-const FULLSCREEN_PATTERNS = ['/cb/:slug', '/cb/:slug/campaigns/:campaignId/adGroups', '/cm/:slug/campaigns/:campaignId/create-ad-group'];
+const FULLSCREEN_PATTERNS = ['/cb/:slug', '/cb/:slug/campaigns/:campaignId/adGroups', '/cm/:slug/campaigns/:campaignId/create-ad-group', '/cb/sb/adGroups/:adGroupId/ads'];
 
 // Pages that sit under the campaign manager sub-nav. The all-campaigns view
 // starts with it collapsed (as on the console); the /cm list pages show it open.

@@ -371,7 +371,7 @@ export const useStore = create(
 
       // SB Ad Actions
       addSbAd: (ad) => set((state) => ({
-        sbAds: [...(state.sbAds || []), { ...ad, id: `sba${Date.now()}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
+        sbAds: [...(state.sbAds || []), { ...ad, id: `sba${Date.now()}${Math.random().toString(36).slice(2, 7)}`, metrics: { impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 } }]
       })),
       updateSbAd: (id, updates) => set((state) => ({
         sbAds: (state.sbAds || []).map(a => a.id === id ? { ...a, ...updates } : a)

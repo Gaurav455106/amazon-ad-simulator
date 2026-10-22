@@ -7,6 +7,7 @@ import './styles/builder.css'
 import './styles/sd.css'
 import './styles/createCampaign.css'
 import './styles/table.css'
+import './styles/ads.css'
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(

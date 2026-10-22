@@ -5,6 +5,7 @@ import CampaignManager from './pages/campaigns/CampaignManager';
 import CampaignDetail from './pages/campaigns/CampaignDetail';
 import AdGroupDetail from './pages/adgroups/AdGroupDetail';
 import Reports from './pages/reports/Reports';
+import SbNewAdPage from './pages/adgroups/sb/SbNewAdPage';
 import SearchTerms from './pages/SearchTerms';
 import BidRecommendations from './pages/BidRecommendations';
 import AuctionInsights from './pages/AuctionInsights';
@@ -77,6 +78,7 @@ export default function App() {
 
           {/* Campaign builder */}
           <Route path="/cb" element={<CreateCampaign />} />
+          <Route path="/cb/sb/adGroups/:adGroupId/ads" element={<SbNewAdPage />} />
           <Route path="/cb/:type" element={<CreateCampaignSetup />} />
           <Route path="/cb/:type/campaigns/:campaignId/adGroups" element={<CreateCampaignSetup />} />
 

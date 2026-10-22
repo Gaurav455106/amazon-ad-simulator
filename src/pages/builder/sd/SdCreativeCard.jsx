@@ -43,8 +43,11 @@ function OptionLine({ label, isOn, onToggle, status, onOpen, isRequired }) {
   );
 }
 
-/** "Creative" card (appears once a product is added): customise options + Key ad sizes preview. */
-export default function SdCreativeCard({ brand, products, creative, onCreative, adFormat }) {
+/**
+ * "Creative" card (appears once a product is added): customise options + Key ad sizes preview.
+ * On an ad group's Creative tab it starts as preview only (`isReadOnly`) with an "Edit creative" button.
+ */
+export default function SdCreativeCard({ brand, products, creative, onCreative, adFormat, isReadOnly = false, onEdit, isBare = false }) {
   const [panel, setPanel] = useState(null);
   const [page, setPage] = useState(0);
   const set = (patch) => onCreative({ ...creative, ...patch });
@@ -56,9 +59,9 @@ export default function SdCreativeCard({ brand, products, creative, onCreative, 
     : <button type="button" className="sd-link" onClick={() => setPanel(openKey)}>Add</button>);
 
   return (
-    <SdCard title="Creative" help="How to customize your creative" className="sd-card-flush">
-      <div className="sd-creative">
-        <div className="sd-cr-left">
+    <Wrapper isBare={isBare}>
+      <div className={`sd-creative ${isReadOnly ? 'is-read-only' : ''}`}>
+        {!isReadOnly && <div className="sd-cr-left">
           {!panel && (
             <>
               <p className="sd-cr-intro">Choose how you would like to customise your ad. <Info size={12} /></p>
@@ -118,10 +121,10 @@ export default function SdCreativeCard({ brand, products, creative, onCreative, 
               )}
             </div>
           )}
-        </div>
+        </div>}
         <div className="sd-cr-right">
           <div className="sd-preview-bar">
-            <strong>Preview:</strong>
+            {isReadOnly ? <button type="button" className="sd-btn" onClick={onEdit}>Edit creative</button> : <strong>Preview:</strong>}
             <PillSelect value="key" onChange={() => {}} width={250} ariaLabel="Preview sizes" options={[{ value: 'key', label: 'Key ad sizes' }]} />
             <span className="sd-push">{page * PREVIEWS_PER_PAGE + 1} of {SD_PREVIEW_SIZES.length}</span>
             <span className="sd-arrows">
@@ -140,6 +143,11 @@ export default function SdCreativeCard({ brand, products, creative, onCreative, 
           </div>
         </div>
       </div>
-    </SdCard>
+    </Wrapper>
   );
+}
+
+function Wrapper({ isBare, children }) {
+  if (isBare) return <div className="sd-card sd-card-flush">{children}</div>;
+  return <SdCard title="Creative" help="How to customize your creative" className="sd-card-flush">{children}</SdCard>;
 }

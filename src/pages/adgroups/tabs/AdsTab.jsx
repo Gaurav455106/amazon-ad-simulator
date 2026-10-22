@@ -1,148 +1,129 @@
 import { useMemo, useState } from 'react';
-import { X, ExternalLink, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import { useStore } from '../../../store/useStore';
 import { useConsoleRange } from '../../../hooks/useConsoleRange';
 import { rangeMetrics, withParentStart } from '../../../utils/performance';
+import { adStatus } from '../../../utils/campaignStatus';
+import { localISODate } from '../../../utils/dateRanges';
+import { newSbAdPath } from '../../../routes';
+import { amazonPdpUrl } from '../../../data/demoProducts';
 import ProductImage from '../../../components/console/ProductImage';
+import ProductLink from '../../../components/console/ProductLink';
+import StatusDetails from '../../../components/console/StatusDetails';
+import AddProductsModal from '../../../components/console/AddProductsModal';
 import ConsoleTable from '../../../components/console/table/ConsoleTable';
 import { ActiveSwitch } from '../../../components/console/table/InlineEdit';
 import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
 import { DEFAULT_STATUS_FILTER, statusField } from '../../../components/console/table/tableFilters';
-import ProductLink from '../../../components/console/ProductLink';
+import SbManageAdDrawer from '../sb/SbManageAdDrawer';
+import { ViewPageLink } from '../sb/SbLandingPage';
+import { sbAdsFor, toStoredAd } from '../sbAds';
 
 const PRODUCT_COLUMNS = ['spend', 'orders', 'sales', 'roas', 'impressions', 'clicks'];
 const PRODUCT_EXTRA = ['ctr', 'cpc', 'acos'];
+const SD_COLUMNS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'dpv', 'orders'];
+const SD_EXTRA = ['sales', 'acos', 'roas'];
 const SB_COLUMNS = ['clicks', 'dpv', 'spend', 'orders', 'sales'];
 const SB_EXTRA = ['impressions', 'ctr', 'cpc', 'acos', 'roas'];
-const RATIO_METRICS = ['ctr', 'cpc', 'acos', 'roas'];
+const RATIO_METRICS = ['ctr', 'cpc', 'acos', 'roas', 'cvr'];
 
-function AddProductsModal({ existing, onClose, onSave }) {
-  const products = useStore(s => s.products);
-  const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState([]);
-  const list = products.filter(p => !query || `${p.name} ${p.asin} ${p.sku}`.toLowerCase().includes(query.toLowerCase()));
-  const isAdded = (asin) => existing.includes(asin) || picked.includes(asin);
+/** Splits an ad group's metrics by share; ratio metrics stay the ad group's own. */
+const splitMetrics = (m, share) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, RATIO_METRICS.includes(k) ? (share ? v : 0) : v * share]));
 
+/** The ad name box: click to rename in place (Enter saves, Escape cancels). */
+function AdNameBox({ name, onRename }) {
+  const [draft, setDraft] = useState(null);
+  if (draft === null) return <button type="button" className="cx-cell-box ad-name-box" onClick={() => setDraft(name)}>{name}</button>;
+  const commit = () => { if (draft.trim()) onRename(draft.trim()); setDraft(null); };
+  return <input autoFocus className="cx-cell-input ad-name-input" value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
+    onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }} />;
+}
+
+function SbAds({ campaign, adGroup, agMetrics }) {
+  const navigate = useNavigate();
+  const sbAds = useStore(s => s.sbAds || []);
+  const catalogue = useStore(s => s.products);
+  const addSbAd = useStore(s => s.addSbAd);
+  const updateSbAd = useStore(s => s.updateSbAd);
+  const [managing, setManaging] = useState(null);
+  const ads = sbAdsFor(campaign, adGroup, sbAds);
+
+  // Ads added today have no history yet; the ad group's delivery splits across the older ones.
+  const today = localISODate();
+  const olderCount = ads.filter(a => !a.createdAt || a.createdAt < today).length || 1;
+  const rows = ads.map(ad => ({ ad, isOn: ad.status === 'Enabled', m: splitMetrics(agMetrics, ad.createdAt === today ? 0 : 1 / olderCount) }));
+  const save = (ad, patch = {}) => {
+    const next = { ...ad, ...patch };
+    if (ad.isVirtual) addSbAd(toStoredAd(next)); else updateSbAd(ad.id, toStoredAd(next));
+  };
+  const statusOf = (r) => adStatus({ campaign, adGroup, isOn: r.isOn, pendingReview: r.ad.pendingReview });
+
+  const columns = [
+    { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.ad.status,
+      cell: r => <ActiveSwitch isOn={r.isOn} onToggle={() => save(r.ad, { status: r.isOn ? 'Paused' : 'Enabled' })} /> },
+    { key: 'name', label: 'Ad name', fixed: true, csv: r => r.ad.name,
+      cell: r => <><AdNameBox name={r.ad.name} onRename={name => save(r.ad, { name })} /><br /><button type="button" className="cx-link" onClick={() => setManaging(r.ad)}>Manage ad</button></> },
+    { key: 'status', label: 'Status', group: GROUPS.settings, csv: r => statusOf(r).status, cell: r => <StatusDetails {...statusOf(r)} /> },
+    { key: 'landing', label: 'Landing page', group: GROUPS.detail, csv: r => (r.ad.landingPage === 'new' ? 'New landing page' : 'Store on Amazon'),
+      cell: r => <ViewPageLink brand={r.ad.brandName} label="View landing page" /> },
+    ...metricColumns([...SB_COLUMNS, ...SB_EXTRA], SB_COLUMNS),
+  ];
   return (
-    <div className="cx-modal-overlay" onClick={onClose}>
-      <div className="cx-modal" onClick={e => e.stopPropagation()}>
-        <div className="cx-modal-head">
-          <h2>Add products</h2>
-          <button type="button" className="cx-tool-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
-        </div>
-        <div className="cx-modal-body kw-modal">
-          <div className="kw-modal-left">
-            <label className="cx-search"><Search size={16} /><input placeholder="Search by product name, ASIN or SKU" value={query} onChange={e => setQuery(e.target.value)} /></label>
-            <div className="prod-list">
-              {list.map(p => (
-                <div key={p.asin} className="prod-row">
-                  <ProductImage product={p} size={44} />
-                  <div className="prod-row-text">
-                    <ProductLink asin={p.asin} className="cx-link prod-title">{p.name}</ProductLink>
-                    <span className="cx-sub">₹{p.price} · ASIN: {p.asin} · SKU: {p.sku}</span>
-                  </div>
-                  {isAdded(p.asin)
-                    ? <span className="cx-sub">Added</span>
-                    : <button type="button" className="cx-btn" onClick={() => setPicked(x => [...x, p.asin])}>Add</button>}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="kw-modal-right">
-            <div className="kw-added-head"><strong>{picked.length} products</strong><button type="button" className="cx-link" onClick={() => setPicked([])}>Remove all</button></div>
-            {picked.map(asin => (
-              <div key={asin} className="prod-row">
-                <span className="prod-row-text">{products.find(p => p.asin === asin)?.name}</span>
-                <button type="button" className="cx-tool-btn" aria-label="Remove" onClick={() => setPicked(x => x.filter(a => a !== asin))}><X size={14} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="cx-modal-foot">
-          <button type="button" className="cx-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="cx-btn cx-btn-primary" disabled={picked.length === 0} onClick={() => { onSave(picked); onClose(); }}>Save</button>
-        </div>
-      </div>
-    </div>
+    <>
+      <ConsoleTable tableKey="sb-ads" exportName={`${adGroup.name} ads`} columns={columns} rows={rows} rowKey={r => r.ad.id}
+        filterFields={[statusField(r => r.ad.status), ...metricFilterFields([...SB_COLUMNS, ...SB_EXTRA])]} paginate={false}
+        search={{ placeholder: 'Find an ad', match: (r, q) => r.ad.name.toLowerCase().includes(q) }}
+        leftActions={<button type="button" className="cx-btn cx-btn-pill" onClick={() => navigate(newSbAdPath(campaign, adGroup.id))}>Create ad</button>} />
+      {managing && (
+        <SbManageAdDrawer ad={managing} adFormat={campaign.adFormat} catalogue={catalogue}
+          onSubmit={next => save(managing, next)} onClose={() => setManaging(null)} />
+      )}
+    </>
   );
 }
 
-export default function AdsTab({ campaign, adGroup }) {
+/** Product ads (Sponsored Products and Display): one row per advertised ASIN. */
+function ProductAds({ campaign, adGroup, agMetrics, isSD }) {
   const products = useStore(s => s.products);
   const updateAdGroup = useStore(s => s.updateAdGroup);
-  const range = useConsoleRange();
   const [isAdding, setIsAdding] = useState(false);
-
-  const isSB = campaign.type === 'Sponsored Brands';
-  const isSD = campaign.type === 'Sponsored Display';
   const asins = useMemo(() => adGroup.products || [], [adGroup.products]);
   const paused = adGroup.pausedProducts || [];
-  const agMetrics = rangeMetrics(withParentStart(adGroup, campaign), range);
-  const isLive = campaign.status === 'Enabled' && adGroup.status === 'Enabled';
+  const [main, extra] = isSD ? [SD_COLUMNS, SD_EXTRA] : [PRODUCT_COLUMNS, PRODUCT_EXTRA];
 
-  // Split ad group performance across its product ads by a stable per-ASIN share (ratios stay the ad group's).
+  // Split ad group performance across its product ads by a stable per-ASIN share.
   const rows = useMemo(() => {
     const weights = asins.map((a, i) => 1 + ((a.charCodeAt(a.length - 1) + i) % 5) / 4);
     const total = weights.reduce((x, y) => x + y, 0) || 1;
-    return asins.map((asin, i) => {
-      const share = weights[i] / total;
-      const isOn = !paused.includes(asin);
-      const m = Object.fromEntries(Object.entries(agMetrics).map(([k, v]) => [k, RATIO_METRICS.includes(k) ? v : v * share]));
-      return { asin, product: products.find(p => p.asin === asin), isOn, m };
-    });
+    return asins.map((asin, i) => ({ asin, product: products.find(p => p.asin === asin), isOn: !paused.includes(asin), m: splitMetrics(agMetrics, weights[i] / total) }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asins, products, paused.join(), agMetrics.spend, agMetrics.impressions]);
 
-  const toggleProduct = (asin) => updateAdGroup(adGroup.id, {
-    pausedProducts: paused.includes(asin) ? paused.filter(a => a !== asin) : [...paused, asin],
+  const setPaused = (picked, isPaused) => updateAdGroup(adGroup.id, {
+    pausedProducts: isPaused ? [...new Set([...paused, ...picked])] : paused.filter(a => !picked.includes(a)),
   });
-  const adStatus = (r) => (!isLive || !r.isOn ? 'Paused' : r.product?.status === 'Out of stock' ? 'Out of stock' : 'Delivering');
-
-  if (isSB) {
-    const creative = campaign.sbCreative || {};
-    const sbRows = [{ id: adGroup.id, m: agMetrics }];
-    const columns = [
-      { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: () => adGroup.status,
-        cell: () => <ActiveSwitch isOn={adGroup.status === 'Enabled'} onToggle={() => updateAdGroup(adGroup.id, { status: adGroup.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
-      { key: 'name', label: 'Ad name', fixed: true, csv: () => creative.headline || adGroup.name,
-        cell: () => <><span className="cx-cell-box">{creative.headline || adGroup.name}</span><br /><button type="button" className="cx-link">Manage ad</button></> },
-      { key: 'status', label: 'Status', group: GROUPS.settings, csv: () => (isLive ? 'Delivering' : 'Paused'), cell: () => (isLive ? 'Delivering' : 'Paused') },
-      { key: 'landing', label: 'Landing page', group: GROUPS.detail, csv: () => 'Store', cell: () => <span className="cx-link">View landing page <ExternalLink size={12} /></span> },
-      ...metricColumns([...SB_COLUMNS, ...SB_EXTRA], SB_COLUMNS),
-    ];
-    return (
-      <ConsoleTable tableKey="sb-ads" exportName={`${adGroup.name} ads`} columns={columns} rows={sbRows} rowKey={r => r.id}
-        filterFields={metricFilterFields([...SB_COLUMNS, ...SB_EXTRA])} paginate={false}
-        leftActions={<button type="button" className="cx-btn cx-btn-pill">Create ad</button>} />
-    );
-  }
+  const statusOf = (r) => adStatus({ campaign, adGroup, isOn: r.isOn, product: r.product });
 
   const columns = [
     { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => (r.isOn ? 'Enabled' : 'Paused'),
-      cell: r => <ActiveSwitch isOn={r.isOn} onToggle={() => toggleProduct(r.asin)} /> },
-    { key: 'name', label: 'Ad name', fixed: true, info: true, csv: r => r.product?.name || r.asin,
+      cell: r => <ActiveSwitch isOn={r.isOn} onToggle={() => setPaused([r.asin], r.isOn)} /> },
+    { key: 'name', label: isSD ? 'Ads' : 'Ad name', fixed: true, info: true, csv: r => r.product?.name || r.asin,
       cell: r => (
         <div className="prod-row">
           <ProductImage product={r.product} size={40} />
           <ProductLink asin={r.asin} className="cx-link prod-title">{r.product?.name || r.asin}</ProductLink>
         </div>
       ) },
-    { key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: adStatus, cell: adStatus },
-    { key: 'sku', label: 'SKU/ASIN', group: GROUPS.detail, csv: r => `${r.product?.sku || ''} ${r.asin}`.trim(), cell: r => <>{r.product?.sku || '—'}<span className="cx-sub">{r.asin}</span></> },
-    ...metricColumns([...PRODUCT_COLUMNS, ...PRODUCT_EXTRA], PRODUCT_COLUMNS),
+    { key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: r => statusOf(r).status, cell: r => <StatusDetails {...statusOf(r)} /> },
+    { key: 'sku', label: 'SKU/ASIN', group: GROUPS.detail, csv: r => `${r.product?.sku || ''} ${r.asin}`.trim(),
+      cell: r => <>{r.product?.sku || '—'}<a className="cx-link cx-sub-link" href={amazonPdpUrl(r.asin) || '#'} target="_blank" rel="noopener noreferrer">{r.asin} <ExternalLink size={11} /></a></> },
+    ...metricColumns([...main, ...extra], main),
   ];
-  const bulkSections = (sel, clear) => {
-    const setPaused = (isPaused) => {
-      const picked = sel.map(r => r.asin);
-      const next = isPaused ? [...new Set([...paused, ...picked])] : paused.filter(a => !picked.includes(a));
-      updateAdGroup(adGroup.id, { pausedProducts: next });
-      clear();
-    };
-    return [{ title: 'Quick Actions', items: [
-      { label: 'Enable', disabled: sel.every(r => r.isOn), onClick: () => setPaused(false) },
-      { label: 'Pause', disabled: sel.every(r => !r.isOn), onClick: () => setPaused(true) },
-    ] }];
-  };
+  const bulkSections = (sel, clear) => [{ title: 'Quick Actions', items: [
+    { label: 'Enable', disabled: sel.every(r => r.isOn), onClick: () => { setPaused(sel.map(r => r.asin), false); clear(); } },
+    { label: 'Pause', disabled: sel.every(r => !r.isOn), onClick: () => { setPaused(sel.map(r => r.asin), true); clear(); } },
+  ] }];
 
   return (
     <>
@@ -152,7 +133,7 @@ export default function AdsTab({ campaign, adGroup }) {
         columns={columns}
         rows={rows}
         rowKey={r => r.asin}
-        filterFields={[statusField(r => (r.isOn ? 'Enabled' : 'Paused')), ...metricFilterFields([...PRODUCT_COLUMNS, ...PRODUCT_EXTRA])]}
+        filterFields={[statusField(r => (r.isOn ? 'Enabled' : 'Paused')), ...metricFilterFields([...main, ...extra])]}
         initialFilters={[DEFAULT_STATUS_FILTER]}
         search={{ placeholder: isSD ? 'Find a product' : 'Search ads', match: (r, q) => `${r.product?.name} ${r.asin} ${r.product?.sku}`.toLowerCase().includes(q) }}
         leftActions={(
@@ -163,7 +144,17 @@ export default function AdsTab({ campaign, adGroup }) {
         bulkSections={bulkSections}
         empty={<div className="cx-empty"><h3>No ads</h3><p>Add products to start advertising in this ad group.</p></div>}
       />
-      {isAdding && <AddProductsModal existing={asins} onClose={() => setIsAdding(false)} onSave={(added) => updateAdGroup(adGroup.id, { products: [...asins, ...added] })} />}
+      {isAdding && (
+        <AddProductsModal existing={asins} title={isSD ? 'Add products to advertise' : 'Add products'}
+          onClose={() => setIsAdding(false)} onSave={(added) => updateAdGroup(adGroup.id, { products: [...asins, ...added] })} />
+      )}
     </>
   );
+}
+
+export default function AdsTab({ campaign, adGroup }) {
+  const range = useConsoleRange();
+  const agMetrics = rangeMetrics(withParentStart(adGroup, campaign), range);
+  if (campaign.type === 'Sponsored Brands') return <SbAds campaign={campaign} adGroup={adGroup} agMetrics={agMetrics} />;
+  return <ProductAds campaign={campaign} adGroup={adGroup} agMetrics={agMetrics} isSD={campaign.type === 'Sponsored Display'} />;
 }
