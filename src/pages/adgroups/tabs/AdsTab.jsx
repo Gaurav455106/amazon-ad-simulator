@@ -7,6 +7,7 @@ import { rangeMetrics, withParentStart } from '../../../utils/performance';
 import { formatMetric, METRICS } from '../../../components/console/metrics';
 import ProductImage from '../../../components/console/ProductImage';
 import TableDateButton from '../../../components/console/TableDateButton';
+import ProductLink from '../../../components/console/ProductLink';
 
 const PRODUCT_COLUMNS = ['spend', 'orders', 'sales', 'roas', 'impressions', 'clicks'];
 const SB_COLUMNS = ['clicks', 'dpv', 'spend', 'orders', 'sales'];
@@ -33,7 +34,7 @@ function AddProductsModal({ existing, onClose, onSave }) {
                 <div key={p.asin} className="prod-row">
                   <ProductImage product={p} size={44} />
                   <div className="prod-row-text">
-                    <span className="cx-link prod-title">{p.name}</span>
+                    <ProductLink asin={p.asin} className="cx-link prod-title">{p.name}</ProductLink>
                     <span className="cx-sub">₹{p.price} · ASIN: {p.asin} · SKU: {p.sku}</span>
                   </div>
                   {isAdded(p.asin)

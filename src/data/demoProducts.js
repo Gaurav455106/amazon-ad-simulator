@@ -25,3 +25,7 @@ export const BASE_PRODUCTS = [
   farmley('B0BRQJLP5Q', 'FM-SUNFLOWER-200', 'Sunflower Seeds 200 gram I Sunflower Seeds for Eating | Diet Food | Healthy Snack | Raw seeds | Weight management | Source of Antioxidants Pack of 1', 109, 159, 4.3, 487, '71ZjhLjvcrL'),
 ];
 
+
+const ASIN_PATTERN = /^B[A-Z0-9]{9}$/;
+/** The product's amazon.in detail page, or null for a malformed ASIN. */
+export const amazonPdpUrl = (asin) => (ASIN_PATTERN.test(String(asin)) ? `https://www.amazon.in/dp/${asin}` : null);

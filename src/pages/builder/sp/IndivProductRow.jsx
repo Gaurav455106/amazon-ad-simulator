@@ -1,4 +1,5 @@
 import Info from '../../../components/console/InfoGlyph';
+import ProductLink from '../../../components/console/ProductLink';
 
 const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const STAR_PATH = 'M8 1.2l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 12l-4.2 2.2.8-4.7L1.2 6.2l4.7-.7z';
@@ -32,7 +33,7 @@ export default function IndivProductRow({ product: p, image, types, isAdded, onA
         <div className="ip-body">
           <div className="ip-img">{image}</div>
           <div className="ip-info">
-            <span className="ip-title">{p.name}</span>
+            <ProductLink asin={p.asin} className="ip-title">{p.name}</ProductLink>
             <span className="ip-rating"><Stars value={p.stars} /><span className="ip-count">({p.reviews.toLocaleString('en-IN')})</span></span>
             {isDeal
               ? <span className="ip-price"><s>{inr(p.originalPrice)}</s> <b>{inr(p.price)}</b></span>

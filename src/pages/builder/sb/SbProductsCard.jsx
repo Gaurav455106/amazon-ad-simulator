@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Search, X } from 'l
 import Info from '../../../components/console/InfoGlyph';
 import ProductImage from '../../../components/console/ProductImage';
 import { SB_MIN_PRODUCTS, SB_MAX_PRODUCTS, parseAsinList } from './limits';
+import ProductLink from '../../../components/console/ProductLink';
 const BEST_RESULTS_PRODUCTS = 5;
 const PAGE_SIZE = 10;
 const STAR_PATH = 'M8 1.2l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 12l-4.2 2.2.8-4.7L1.2 6.2l4.7-.7z';
@@ -115,7 +116,7 @@ export default function SbProductsCard({ catalogue, products, onChange, brand })
                 {shown.map(p => (
                   <div key={p.asin} className="sbp-row">
                     <ProductImage product={p} size={60} />
-                    <div className="sbp-info"><span className="sbp-title">{p.name}</span><ProductMeta product={p} /></div>
+                    <div className="sbp-info"><ProductLink asin={p.asin} className="sbp-title">{p.name}</ProductLink><ProductMeta product={p} /></div>
                     <button type="button" className="sbp-add" disabled={isAdded(p.asin) || isFull} onClick={() => add([p])}>
                       {isAdded(p.asin) ? 'Added' : 'Add'}
                     </button>
@@ -168,7 +169,7 @@ export default function SbProductsCard({ catalogue, products, onChange, brand })
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => move(Number(e.dataTransfer.getData('text/plain')), i)}>⋮⋮</span>
               <ProductImage product={p} size={56} />
-              <div className="sbp-info"><span className="sbp-title sbp-title-2">{p.name}</span><ProductMeta product={p} /></div>
+              <div className="sbp-info"><ProductLink asin={p.asin} className="sbp-title sbp-title-2">{p.name}</ProductLink><ProductMeta product={p} /></div>
               <button type="button" className="ng-x" aria-label={`Remove ${p.asin}`} onClick={() => remove(p.asin)}><X size={14} /></button>
             </div>
           ))}

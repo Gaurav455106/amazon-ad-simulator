@@ -9,6 +9,7 @@ import { rangeMetrics, sumMetrics, withParentStart } from '../../utils/performan
 import { formatMetric } from '../../components/console/metrics';
 import ProductImage from '../../components/console/ProductImage';
 import TableDateButton from '../../components/console/TableDateButton';
+import ProductLink from '../../components/console/ProductLink';
 
 const FULL_STARS = 5;
 
@@ -88,7 +89,7 @@ export default function Products() {
                       <div className="prod-row">
                         <ProductImage product={p} size={44} />
                         <div className="prod-row-text">
-                          <span className="cx-link prod-title">{p.name}</span>
+                          <ProductLink asin={p.asin} className="cx-link prod-title">{p.name}</ProductLink>
                           <Stars rating={p.rating} reviews={p.reviews} /> <span className="cx-sub">Price may vary by location</span>
                           <span className="cx-sub">ASIN: {p.asin} | SKU: {p.sku}</span>
                         </div>

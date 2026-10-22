@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import Info from '../../../components/console/InfoGlyph';
 import ProductImage from '../../../components/console/ProductImage';
 import { SdCard, PillSelect, SubTabs } from './SdBits';
+import ProductLink from '../../../components/console/ProductLink';
 
 const STAR_PATH = 'M8 1.2l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 12l-4.2 2.2.8-4.7L1.2 6.2l4.7-.7z';
 const inr = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -91,7 +92,7 @@ export default function SdProductsCard({ catalogue, products, onChange, isVideo 
                 {ordered.map(p => (
                   <div key={p.asin} className="sd-prod-row">
                     <ProductImage product={p} size={56} />
-                    <div className="sd-prod-info"><a href="#product" className="sd-prod-title" onClick={e => e.preventDefault()}>{p.name}</a><ProductMeta p={p} /></div>
+                    <div className="sd-prod-info"><ProductLink asin={p.asin} className="sd-prod-title">{p.name}</ProductLink><ProductMeta p={p} /></div>
                     <button type="button" className="sd-add-pill" disabled={isAdded(p.asin)} onClick={() => add([p])}>{isAdded(p.asin) ? 'Added' : 'Add'}</button>
                   </div>
                 ))}
@@ -129,7 +130,7 @@ export default function SdProductsCard({ catalogue, products, onChange, isVideo 
           {products.map(p => (
             <div key={p.asin} className="sd-added-prod">
               <ProductImage product={p} size={48} />
-              <div className="sd-prod-info"><span className="sd-prod-title sd-clamp">{p.name}</span><ProductMeta p={p} /></div>
+              <div className="sd-prod-info"><ProductLink asin={p.asin} className="sd-prod-title sd-clamp">{p.name}</ProductLink><ProductMeta p={p} /></div>
               <button type="button" className="sd-x" aria-label={`Remove ${p.asin}`} onClick={() => onChange(products.filter(x => x.asin !== p.asin))}><X size={15} /></button>
             </div>
           ))}

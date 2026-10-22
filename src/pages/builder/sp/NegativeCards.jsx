@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, CircleHelp, Search, X } from 'lucide-react';
 import Info from '../../../components/console/InfoGlyph';
+import ProductLink from '../../../components/console/ProductLink';
 
 const ASIN_RE = /^B[0-9A-Z]{9}$/;
 const NEG_MATCH = [
@@ -143,7 +144,7 @@ export default function NegativeCards({ negKeywords, onNegKeywords, negProducts,
                   {q && matches.length === 0 && <p className="ng-hint">No products found for "{prodQuery}".</p>}
                   {matches.map(p => (
                     <div key={p.asin} className="ng-prod-row">
-                      <span className="ng-prod-name">{p.name}<small>ASIN: {p.asin}</small></span>
+                      <span className="ng-prod-name"><ProductLink asin={p.asin}>{p.name}</ProductLink><small>ASIN: {p.asin}</small></span>
                       {isExcluded({ kind: 'product', asin: p.asin })
                         ? <span className="ng-muted">Excluded</span>
                         : <button type="button" className="ng-link" onClick={() => exclude({ kind: 'product', asin: p.asin, name: p.name })}>Exclude</button>}

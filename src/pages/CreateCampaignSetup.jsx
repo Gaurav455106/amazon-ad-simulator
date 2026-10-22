@@ -25,6 +25,7 @@ import { campaignPath, ROUTES } from '../routes';
 
 import { ChevronDown, ChevronUp, ChevronRight, Search, X, CircleHelp } from 'lucide-react';
 import Info from '../components/console/InfoGlyph';
+import ProductLink from '../components/console/ProductLink';
 
 const TYPE_MAP = {
   sp: 'Sponsored Products',
@@ -122,6 +123,9 @@ function TipIcon({ tip }) {
   );
 }
 
+// The console's product source filter; Global Store Listings lists products sold in other marketplaces.
+const PRODUCT_SOURCES = { yours: 'Your Listings', global: 'Global Store Listings' };
+
 function Toggle({ on, onChange }) {
   return (
     <button
@@ -215,6 +219,8 @@ export default function CreateCampaignSetup() {
   const [dragOver, setDragOver] = useState(false);
   const [productSort, setProductSort] = useState('newest');
   const [productSortOpen, setProductSortOpen] = useState(false);
+  const [productSource, setProductSource] = useState('yours'); // yours | global (Global Store Listings)
+  const [productSourceOpen, setProductSourceOpen] = useState(false);
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase();
@@ -3947,10 +3953,23 @@ export default function CreateCampaignSetup() {
                           placeholder="Search by product name, ASIN or SKU"
                         />
                       </div>
-                      <button className="ccs-filter-btn">
-                        Your Listings <ChevronDown size={13} />
-                      </button>
+                      <div style={{ position: 'relative' }}>
+                        <button type="button" className="ccs-filter-btn" aria-haspopup="listbox" aria-expanded={productSourceOpen} onClick={() => setProductSourceOpen(o => !o)}>
+                          {PRODUCT_SOURCES[productSource]} <ChevronDown size={13} />
+                        </button>
+                        {productSourceOpen && (
+                          <div className="ccs-sort-dropdown" role="listbox">
+                            {Object.entries(PRODUCT_SOURCES).map(([k, l]) => (
+                              <button type="button" role="option" aria-selected={productSource === k} key={k} className={`ccs-sort-option ${productSource === k ? 'selected' : ''}`}
+                                onClick={() => { setProductSource(k); setProductSourceOpen(false); }}>{l}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    {productSource === 'global' ? (
+                      <p className="ccs-global-empty">There are no available products for your campaign. Visit Seller Central or Vendor Central to manage your inventory. After your products are available, they will appear here for selection.</p>
+                    ) : (<>
                     <div className="ccs-products-meta">
                       <div className="ccs-show-row">
                         <span>Show:</span>
@@ -3979,7 +3998,7 @@ export default function CreateCampaignSetup() {
                           <div key={p.asin} className="ccs-product-row">
                             <ProductImage product={p} />
                             <div className="ccs-product-details">
-                              <div className="ccs-product-name-link">{p.name}</div>
+                              <ProductLink asin={p.asin} className="ccs-product-name-link">{p.name}</ProductLink>
                               <div className="ccs-product-sub">
                                 <Stars rating={p.rating} />
                                 <span className="ccs-product-count">({p.reviews})</span>
@@ -4011,6 +4030,7 @@ export default function CreateCampaignSetup() {
                         </div>
                       </div>
                     </div>
+                    </>)}
                   </>
                 )}
 
@@ -4121,7 +4141,7 @@ export default function CreateCampaignSetup() {
                       <div key={p.asin} className="pd-added">
                         <ProductImage product={p} size={60} />
                         <div className="pd-info">
-                          <span className="pd-title">{p.name}</span>
+                          <ProductLink asin={p.asin} className="pd-title">{p.name}</ProductLink>
                           <span className="pd-meta"><Stars rating={p.rating} /><span className="pd-count">({p.reviews})</span><span className="pd-price">₹{Number(p.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
                           <span className={`pd-stock ${p.status === 'In stock' ? '' : 'is-out'}`}>{p.status !== 'In stock' && <InfoIcon />} {p.status}</span>
                           <span className="pd-id">ASIN: {p.asin}</span>
