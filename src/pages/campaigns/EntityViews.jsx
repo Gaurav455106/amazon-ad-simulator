@@ -1,99 +1,77 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { adGroupPath, campaignPath } from '../../routes';
 import { consoleId } from '../../utils/consoleId';
 import { formatCurrency } from '../../utils/simulation';
-import { METRICS, formatMetric } from '../../components/console/metrics';
-import Pagination from '../../components/console/Pagination';
+import ConsoleTable from '../../components/console/table/ConsoleTable';
+import InlineNumber, { ActiveSwitch } from '../../components/console/table/InlineEdit';
+import { statusBulkSection } from '../../components/console/table/bulkActions';
+import { GROUPS, metricColumns, metricFilterFields } from '../../components/console/table/columns';
+import { DEFAULT_STATUS_FILTER, statusField, numberField, choiceField } from '../../components/console/table/tableFilters';
 
-const METRIC_COLUMNS = ['impressions', 'clicks', 'spend', 'orders', 'sales', 'acos', 'roas'];
-const DEFAULT_PAGE_SIZE = 50;
+const METRIC_KEYS = ['impressions', 'clicks', 'ctr', 'cpc', 'spend', 'orders', 'sales', 'acos', 'roas'];
+const DEFAULT_METRICS = ['impressions', 'clicks', 'spend', 'orders', 'sales', 'acos', 'roas'];
+const MATCH_TYPES = ['Exact', 'Phrase', 'Broad'].map(v => ({ value: v, label: v }));
+const MIN_BID = 1;
 
-function usePaging(total) {
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const slice = (list) => list.slice(page * pageSize, (page + 1) * pageSize);
-  return { slice, footer: <Pagination total={total} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} /> };
-}
-
-const MetricCells = ({ m }) => METRIC_COLUMNS.map(k => <td key={k} className="is-num">{m[k] ? formatMetric(k, m[k]) : '—'}</td>);
-const MetricHeads = () => METRIC_COLUMNS.map(k => <th key={k} className="is-num">{METRICS[k].label}</th>);
+const agStatus = (c, ag) => (c.status !== 'Enabled' ? 'Campaign paused' : ag.status === 'Enabled' ? 'Delivering' : 'Paused');
+const campaignCell = (c) => <><Link className="cx-link" to={campaignPath(c)}>{c.name}</Link><span className="cx-sub">{c.type}</span></>;
 
 /** All ad groups across campaigns ("Campaigns ▾ → Ad groups" view). */
 export function AdGroupsView({ rows }) {
   const updateAdGroup = useStore(s => s.updateAdGroup);
-  const { slice, footer } = usePaging(rows.length);
+  const columns = useMemo(() => [
+    { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.adGroup.status,
+      cell: ({ adGroup: ag }) => <ActiveSwitch isOn={ag.status === 'Enabled'} disabled={ag.status === 'Archived'} onToggle={() => updateAdGroup(ag.id, { status: ag.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
+    { key: 'name', label: 'Ad group name', fixed: true, csv: r => r.adGroup.name,
+      cell: ({ adGroup: ag, campaign: c }) => <><Link className="cx-link" to={adGroupPath(c, ag.id)}>{ag.name}</Link><span className="cx-id">{consoleId(ag.id)}</span></> },
+    { key: 'campaign', label: 'Campaign', group: GROUPS.detail, csv: r => r.campaign.name, cell: r => campaignCell(r.campaign) },
+    { key: 'status', label: 'Status', group: GROUPS.settings, csv: r => agStatus(r.campaign, r.adGroup), cell: r => <span className="cx-status">{agStatus(r.campaign, r.adGroup)}</span> },
+    { key: 'defaultBid', label: 'Default bid', group: GROUPS.settings, num: true, csv: r => r.adGroup.defaultBid, sortValue: r => r.adGroup.defaultBid || 0,
+      cell: ({ adGroup: ag }) => <InlineNumber display={formatCurrency(ag.defaultBid)} initial={Number(ag.defaultBid || 0).toFixed(2)} min={MIN_BID} onSave={n => updateAdGroup(ag.id, { defaultBid: n })} /> },
+    ...metricColumns(METRIC_KEYS, DEFAULT_METRICS),
+  ], [updateAdGroup]);
+  const fields = useMemo(() => [
+    statusField(r => r.adGroup.status),
+    numberField('defaultBid', 'Default bid', r => r.adGroup.defaultBid || 0),
+    ...metricFilterFields(METRIC_KEYS),
+  ], []);
   return (
-    <>
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr>
-              <th>Active</th><th>Ad group name</th><th>Campaign</th><th>Status</th><th className="is-num">Default bid</th>
-              <MetricHeads />
-            </tr>
-          </thead>
-          <tbody>
-            {slice(rows).map(({ adGroup: ag, campaign: c, m }) => (
-              <tr key={ag.id}>
-                <td>
-                  <button type="button" className={`cx-switch ${ag.status === 'Enabled' ? 'is-on' : ''}`} aria-label={ag.status}
-                    onClick={() => updateAdGroup(ag.id, { status: ag.status === 'Enabled' ? 'Paused' : 'Enabled' })} />
-                </td>
-                <td className="cx-name-cell">
-                  <Link className="cx-link" to={adGroupPath(c, ag.id)}>{ag.name}</Link>
-                  <span className="cx-id">{consoleId(ag.id)}</span>
-                </td>
-                <td><Link className="cx-link" to={campaignPath(c)}>{c.name}</Link><span className="cx-sub">{c.type}</span></td>
-                <td><span className="cx-status">{c.status !== 'Enabled' ? 'Campaign paused' : ag.status === 'Enabled' ? 'Delivering' : 'Paused'}</span></td>
-                <td className="is-num">{formatCurrency(ag.defaultBid)}</td>
-                <MetricCells m={m} />
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td colSpan={12}><div className="cx-empty"><h3>No ad groups</h3><p>Try adjusting your filters.</p></div></td></tr>}
-          </tbody>
-        </table>
-      </div>
-      {footer}
-    </>
+    <ConsoleTable tableKey="all-ad-groups" exportName="Ad groups" columns={columns} rows={rows} rowKey={r => r.adGroup.id}
+      filterFields={fields} initialFilters={[DEFAULT_STATUS_FILTER]}
+      search={{ placeholder: 'Search by name or ID', match: (r, q) => r.adGroup.name.toLowerCase().includes(q) || consoleId(r.adGroup.id).toLowerCase().includes(q) }}
+      bulkSections={(sel, clear) => [statusBulkSection(sel.map(r => r.adGroup), (ag, status) => updateAdGroup(ag.id, { status }), clear)]}
+      empty={<div className="cx-empty"><h3>No ad groups</h3><p>Try adjusting your filters.</p></div>} />
   );
 }
 
 /** All keyword targets across campaigns ("Campaigns ▾ → Targets" view). */
 export function TargetsView({ rows }) {
   const updateKeyword = useStore(s => s.updateKeyword);
-  const { slice, footer } = usePaging(rows.length);
+  const columns = useMemo(() => [
+    { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.keyword.status,
+      cell: ({ keyword: k }) => <ActiveSwitch isOn={k.status === 'Enabled'} disabled={k.status === 'Archived'} onToggle={() => updateKeyword(k.id, { status: k.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
+    { key: 'target', label: 'Target', fixed: true, csv: r => r.keyword.keyword, cell: r => r.keyword.keyword },
+    { key: 'matchType', label: 'Match type', group: GROUPS.settings, csv: r => r.keyword.matchType, cell: r => r.keyword.matchType },
+    { key: 'campaign', label: 'Campaign', group: GROUPS.detail, csv: r => r.campaign.name, cell: r => <Link className="cx-link" to={campaignPath(r.campaign)}>{r.campaign.name}</Link> },
+    { key: 'adGroup', label: 'Ad group', group: GROUPS.detail, csv: r => r.adGroup?.name || '',
+      cell: ({ adGroup: ag, campaign: c }) => (ag ? <Link className="cx-link" to={adGroupPath(c, ag.id, 'targeting')}>{ag.name}</Link> : '—') },
+    { key: 'bid', label: 'Bid', group: GROUPS.settings, num: true, csv: r => r.keyword.bid, sortValue: r => r.keyword.bid || 0,
+      cell: ({ keyword: k }) => <InlineNumber display={formatCurrency(k.bid)} initial={Number(k.bid).toFixed(2)} min={MIN_BID} onSave={n => updateKeyword(k.id, { bid: n })} /> },
+    ...metricColumns(METRIC_KEYS, DEFAULT_METRICS),
+  ], [updateKeyword]);
+  const fields = useMemo(() => [
+    statusField(r => r.keyword.status),
+    choiceField('matchType', 'Match type', MATCH_TYPES, r => r.keyword.matchType),
+    numberField('bid', 'Bid', r => r.keyword.bid || 0),
+    ...metricFilterFields(METRIC_KEYS),
+  ], []);
   return (
-    <>
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr>
-              <th>Active</th><th>Target</th><th>Match type</th><th>Campaign</th><th>Ad group</th><th className="is-num">Bid</th>
-              <MetricHeads />
-            </tr>
-          </thead>
-          <tbody>
-            {slice(rows).map(({ keyword: k, campaign: c, adGroup: ag, m }) => (
-              <tr key={k.id}>
-                <td>
-                  <button type="button" className={`cx-switch ${k.status === 'Enabled' ? 'is-on' : ''}`} aria-label={k.status}
-                    onClick={() => updateKeyword(k.id, { status: k.status === 'Enabled' ? 'Paused' : 'Enabled' })} />
-                </td>
-                <td>{k.keyword}</td>
-                <td>{k.matchType}</td>
-                <td><Link className="cx-link" to={campaignPath(c)}>{c.name}</Link></td>
-                <td>{ag ? <Link className="cx-link" to={adGroupPath(c, ag.id, 'targeting')}>{ag.name}</Link> : '—'}</td>
-                <td className="is-num">{formatCurrency(k.bid)}</td>
-                <MetricCells m={m} />
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td colSpan={13}><div className="cx-empty"><h3>No targets</h3><p>Try adjusting your filters.</p></div></td></tr>}
-          </tbody>
-        </table>
-      </div>
-      {footer}
-    </>
+    <ConsoleTable tableKey="all-targets" exportName="Targets" columns={columns} rows={rows} rowKey={r => r.keyword.id}
+      filterFields={fields} initialFilters={[DEFAULT_STATUS_FILTER]}
+      search={{ placeholder: 'Search by target', match: (r, q) => r.keyword.keyword.toLowerCase().includes(q) }}
+      bulkSections={(sel, clear) => [statusBulkSection(sel.map(r => r.keyword), (k, status) => updateKeyword(k.id, { status }), clear)]}
+      empty={<div className="cx-empty"><h3>No targets</h3><p>Try adjusting your filters.</p></div>} />
   );
 }

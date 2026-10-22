@@ -268,6 +268,11 @@ export const useStore = create(
       history: [],
       negativeProducts: [],
       accountSettings: { budgetCap: 'campaign', budgetCapAmount: '', dailyIncrease: '25' },
+      // Per-table display choices: { [tableKey]: { columns?: string[], density?: 'default'|'compact', mrcOnly?: boolean } }
+      tablePrefs: {},
+      setTablePrefs: (tableKey, patch) => set((state) => ({
+        tablePrefs: { ...state.tablePrefs, [tableKey]: { ...(state.tablePrefs?.[tableKey] || {}), ...patch } },
+      })),
       sbAds: initialSbAds,
       chartData: generateChartData(),
       dateRange: '30',

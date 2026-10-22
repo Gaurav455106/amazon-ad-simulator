@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Search, ListFilter, ChevronDown } from 'lucide-react';
-import Info from '../../../components/console/InfoGlyph';
 import { useStore } from '../../../store/useStore';
 import { useConsoleRange } from '../../../hooks/useConsoleRange';
-import { rangeMetrics, sumMetrics, withParentStart } from '../../../utils/performance';
-import { formatMetric, METRICS } from '../../../components/console/metrics';
-import TableDateButton from '../../../components/console/TableDateButton';
+import { rangeMetrics, withParentStart } from '../../../utils/performance';
+import ConsoleTable from '../../../components/console/table/ConsoleTable';
+import { ActiveSwitch } from '../../../components/console/table/InlineEdit';
+import { statusBulkSection } from '../../../components/console/table/bulkActions';
+import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
+import { DEFAULT_STATUS_FILTER, statusField, numberField, choiceField } from '../../../components/console/table/tableFilters';
 import AddKeywordsModal from '../../../components/console/AddKeywordsModal';
 import { SUGGESTED_KWS } from '../../../data/keywordSuggestions';
 
@@ -37,28 +38,14 @@ function BidInput({ value, onSave }) {
     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }} />;
 }
 
-function Toolbar({ addLabel, onAdd, query, onQuery, isPill }) {
-  return (
-    <div className="cx-toolbar">
-      {addLabel && (
-        <button type="button" className={isPill ? 'cx-btn cx-btn-pill' : 'cx-btn cx-btn-primary'} disabled={!onAdd}
-          title={onAdd ? undefined : 'Not available in the simulator yet'} onClick={onAdd}>
-          {addLabel}
-        </button>
-      )}
-      <label className="cx-search" style={{ width: 240 }}><Search size={16} /><input placeholder="Find a target" value={query} onChange={e => onQuery(e.target.value)} /></label>
-      <button type="button" className="cx-tool-btn" aria-label="Filter by"><ListFilter size={16} /></button>
-      <span className="cx-toolbar-spacer" />
-      <button type="button" className="cx-tool-btn">View: Default <ChevronDown size={14} /></button>
-      <button type="button" className="cx-tool-btn">Columns <ChevronDown size={14} /></button>
-      <TableDateButton />
-      <button type="button" className="cx-tool-btn">Export</button>
-    </div>
-  );
-}
-
-const MetricHeads = () => METRIC_COLUMNS.map(k => <th key={k} className="is-num"><Info size={13} /> {METRICS[k].label}</th>);
-const MetricCells = ({ m }) => METRIC_COLUMNS.map(k => <td key={k} className="is-num">{m && m[k] ? formatMetric(k, m[k]) : '—'}</td>);
+const MATCH_TYPES = ['Exact', 'Phrase', 'Broad'].map(v => ({ value: v, label: v }));
+const activeCol = (get, toggle) => ({ key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => get(r),
+  cell: r => <ActiveSwitch isOn={get(r) === 'Enabled'} disabled={get(r) === 'Archived'} onToggle={() => toggle(r)} /> });
+const statusCol = (get) => ({ key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: get, cell: r => <span className="cx-status">{get(r)}</span> });
+const pill = (label, isPill, onAdd) => (
+  <button type="button" className={isPill ? 'cx-btn cx-btn-pill' : 'cx-btn cx-btn-primary'} disabled={!onAdd}
+    title={onAdd ? undefined : 'Not available in the simulator yet'} onClick={onAdd}>{label}</button>
+);
 
 function AutoTargets({ campaign, adGroup }) {
   const updateAdGroup = useStore(s => s.updateAdGroup);
@@ -66,60 +53,45 @@ function AutoTargets({ campaign, adGroup }) {
   const groups = adGroup.autoTargets || {};
   const agMetrics = rangeMetrics(withParentStart(adGroup, campaign), range);
   const setGroup = (key, patch) => updateAdGroup(adGroup.id, { autoTargets: { ...groups, [key]: { status: 'Enabled', bid: adGroup.defaultBid, ...groups[key], ...patch } } });
-  const enabled = AUTO_GROUPS.filter(g => (groups[g.key]?.status || 'Enabled') === 'Enabled');
+  const enabledCount = AUTO_GROUPS.filter(g => (groups[g.key]?.status || 'Enabled') === 'Enabled').length;
 
-  return (
-    <div className="cx-table-wrap">
-      <table className="cx-table">
-        <thead><tr><th>Active</th><th>Targeting group</th><th>Status</th><th className="is-num">Suggested bid</th><th className="is-num">Bid</th><MetricHeads /></tr></thead>
-        <tbody>
-          {AUTO_GROUPS.map(g => {
-            const st = groups[g.key] || { status: 'Enabled', bid: adGroup.defaultBid };
-            const isOn = st.status === 'Enabled';
-            const share = isOn ? 1 / Math.max(1, enabled.length) : 0;
-            const m = Object.fromEntries(METRIC_COLUMNS.map(k => [k, ['ctr', 'acos', 'roas'].includes(k) ? (isOn ? agMetrics[k] : 0) : agMetrics[k] * share]));
-            return (
-              <tr key={g.key}>
-                <td><button type="button" className={`cx-switch ${isOn ? 'is-on' : ''}`} aria-label={st.status} onClick={() => setGroup(g.key, { status: isOn ? 'Paused' : 'Enabled' })} /></td>
-                <td>{g.label}<span className="cx-sub">{g.hint}</span></td>
-                <td>{isOn ? 'Delivering' : 'Paused'}</td>
-                <td className="is-num">₹{(adGroup.defaultBid * 1.12).toFixed(2)}</td>
-                <td className="is-num"><BidInput value={st.bid ?? adGroup.defaultBid} onSave={(bid) => setGroup(g.key, { bid })} /></td>
-                <MetricCells m={m} />
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+  const rows = AUTO_GROUPS.map(g => {
+    const st = groups[g.key] || { status: 'Enabled', bid: adGroup.defaultBid };
+    const isOn = st.status === 'Enabled';
+    const share = isOn ? 1 / Math.max(1, enabledCount) : 0;
+    const m = Object.fromEntries(METRIC_COLUMNS.map(k => [k, ['ctr', 'acos', 'roas'].includes(k) ? (isOn ? agMetrics[k] : 0) : agMetrics[k] * share]));
+    return { g, st, isOn, m };
+  });
+  const columns = [
+    activeCol(r => r.st.status, r => setGroup(r.g.key, { status: r.isOn ? 'Paused' : 'Enabled' })),
+    { key: 'group', label: 'Targeting group', fixed: true, csv: r => r.g.label, cell: r => <>{r.g.label}<span className="cx-sub">{r.g.hint}</span></> },
+    statusCol(r => (r.isOn ? 'Delivering' : 'Paused')),
+    { key: 'sugg', label: 'Suggested bid', group: GROUPS.settings, num: true, csv: () => (adGroup.defaultBid * 1.12).toFixed(2), cell: () => `₹${(adGroup.defaultBid * 1.12).toFixed(2)}` },
+    { key: 'bid', label: 'Bid', group: GROUPS.settings, num: true, csv: r => r.st.bid ?? adGroup.defaultBid,
+      cell: r => <BidInput value={r.st.bid ?? adGroup.defaultBid} onSave={(bid) => setGroup(r.g.key, { bid })} /> },
+    ...metricColumns(METRIC_COLUMNS),
+  ];
+  return <ConsoleTable tableKey="auto-targets" exportName={`${adGroup.name} targeting`} columns={columns} rows={rows} rowKey={r => r.g.key}
+    filterFields={[statusField(r => r.st.status), ...metricFilterFields(METRIC_COLUMNS)]} paginate={false} />;
 }
 
 function DisplayTargets({ campaign }) {
   const updateCampaign = useStore(s => s.updateCampaign);
   const targets = campaign.sdTargets || [];
-  return (
-    <div className="cx-table-wrap">
-      <table className="cx-table">
-        <thead><tr><th>Active</th><th>Categories and products</th><th>Status</th><th className="is-num">Bid</th></tr></thead>
-        <tbody>
-          {targets.map((t, i) => {
-            const isOn = t.status !== 'Paused';
-            const patch = (p) => updateCampaign(campaign.id, { sdTargets: targets.map((x, j) => (j === i ? { ...x, ...p } : x)) });
-            return (
-              <tr key={`${t.type}-${t.name}`}>
-                <td><button type="button" className={`cx-switch ${isOn ? 'is-on' : ''}`} aria-label={isOn ? 'Enabled' : 'Paused'} onClick={() => patch({ status: isOn ? 'Paused' : 'Enabled' })} /></td>
-                <td><span className="cx-sub">{{ Contextual: 'Contextual targeting', Optimised: 'Optimised targeting' }[t.type] || 'Audience'}</span>{t.name}</td>
-                <td>{isOn ? 'Delivering' : 'Paused'}</td>
-                <td className="is-num">{campaign.costControlEnabled ? <span className="cx-sub" title="Bids are set by cost control">—</span> : t.bid ? <BidInput value={t.bid} onSave={(bid) => patch({ bid })} /> : '—'}</td>
-              </tr>
-            );
-          })}
-          {targets.length === 0 && <tr><td colSpan={4}><div className="cx-empty"><h3>No targets</h3><p>Add contextual or audience targets to reach shoppers.</p></div></td></tr>}
-        </tbody>
-      </table>
-    </div>
-  );
+  const rows = targets.map((t, i) => ({ t, i, isOn: t.status !== 'Paused' }));
+  const patch = (i, p) => updateCampaign(campaign.id, { sdTargets: targets.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  const kind = (t) => ({ Contextual: 'Contextual targeting', Optimised: 'Optimised targeting' }[t.type] || 'Audience');
+  const columns = [
+    activeCol(r => (r.isOn ? 'Enabled' : 'Paused'), r => patch(r.i, { status: r.isOn ? 'Paused' : 'Enabled' })),
+    { key: 'target', label: 'Categories and products', fixed: true, csv: r => r.t.name, cell: r => <><span className="cx-sub">{kind(r.t)}</span>{r.t.name}</> },
+    statusCol(r => (r.isOn ? 'Delivering' : 'Paused')),
+    { key: 'bid', label: 'Bid', group: GROUPS.settings, num: true, csv: r => r.t.bid ?? '',
+      cell: r => (campaign.costControlEnabled ? <span className="cx-sub" title="Bids are set by cost control">—</span> : r.t.bid ? <BidInput value={r.t.bid} onSave={(bid) => patch(r.i, { bid })} /> : '—') },
+  ];
+  return <ConsoleTable tableKey="display-targets" exportName={`${campaign.name} targeting`} columns={columns} rows={rows} rowKey={r => `${r.t.type}-${r.t.name}`}
+    filterFields={[statusField(r => (r.isOn ? 'Enabled' : 'Paused'))]} paginate={false} showDate={false}
+    leftActions={pill('Add contextual targets', true)}
+    empty={<div className="cx-empty"><h3>No targets</h3><p>Add contextual or audience targets to reach shoppers.</p></div>} />;
 }
 
 export default function TargetingTab({ campaign, adGroup }) {
@@ -127,7 +99,6 @@ export default function TargetingTab({ campaign, adGroup }) {
   const addKeywords = useStore(s => s.addKeywords);
   const updateKeyword = useStore(s => s.updateKeyword);
   const range = useConsoleRange();
-  const [query, setQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   const isSD = campaign.type === 'Sponsored Display';
@@ -135,51 +106,56 @@ export default function TargetingTab({ campaign, adGroup }) {
 
   const rows = useMemo(() => keywords
     .filter(k => k.adGroupId === adGroup.id)
-    .filter(k => !query || k.keyword.toLowerCase().includes(query.toLowerCase()))
     .map(k => ({ k, m: rangeMetrics(withParentStart(k, campaign), range) })),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [keywords, adGroup.id, query, campaign.startDate, range.from.getTime(), range.to.getTime()]);
+  [keywords, adGroup.id, campaign.startDate, range.from.getTime(), range.to.getTime()]);
 
-  if (isSD) return <><Toolbar addLabel="Add contextual targets" isPill query={query} onQuery={setQuery} /><DisplayTargets campaign={campaign} /></>;
-  if (isAuto) return <><Toolbar query={query} onQuery={setQuery} /><AutoTargets campaign={campaign} adGroup={adGroup} /></>;
+  if (isSD) return <DisplayTargets campaign={campaign} />;
+  if (isAuto) return <AutoTargets campaign={campaign} adGroup={adGroup} />;
 
-  const status = (k) => (campaign.status !== 'Enabled' || adGroup.status !== 'Enabled' || k.status !== 'Enabled' ? 'Paused' : 'Delivering');
+  const status = (k) => (k.status === 'Archived' ? 'Archived' : campaign.status !== 'Enabled' || adGroup.status !== 'Enabled' || k.status !== 'Enabled' ? 'Paused' : 'Delivering');
+  const columns = [
+    activeCol(r => r.k.status, r => updateKeyword(r.k.id, { status: r.k.status === 'Enabled' ? 'Paused' : 'Enabled' })),
+    { key: 'keyword', label: 'Keyword', fixed: true, csv: r => r.k.keyword, cell: r => r.k.keyword },
+    { key: 'matchType', label: 'Target match type', group: GROUPS.settings, info: true, csv: r => r.k.matchType, cell: r => r.k.matchType },
+    statusCol(r => status(r.k)),
+    { key: 'sugg', label: 'Suggested bid', group: GROUPS.settings, num: true, info: true, csv: r => suggestedFor(r.k).sugg.toFixed(2),
+      cell: ({ k }) => {
+        const s = suggestedFor(k);
+        return (
+          <>
+            ₹{s.sugg.toFixed(2)}
+            <span className="cx-sub">₹{s.min.toFixed(2)} - ₹{s.max.toFixed(2)}</span>
+            {Math.abs(k.bid - s.sugg) > 0.005 && <button type="button" className="cx-link" onClick={() => updateKeyword(k.id, { bid: Number(s.sugg.toFixed(2)) })}>Apply</button>}
+          </>
+        );
+      } },
+    { key: 'bid', label: 'Bid', group: GROUPS.settings, num: true, csv: r => r.k.bid, sortValue: r => r.k.bid,
+      cell: ({ k }) => <BidInput value={k.bid} onSave={(bid) => updateKeyword(k.id, { bid })} /> },
+    ...metricColumns(METRIC_COLUMNS),
+  ];
+  const fields = [
+    statusField(r => r.k.status),
+    choiceField('matchType', 'Target match type', MATCH_TYPES, r => r.k.matchType),
+    numberField('bid', 'Bid', r => r.k.bid),
+    ...metricFilterFields(METRIC_COLUMNS),
+  ];
 
   return (
     <>
-      <Toolbar addLabel="Add keywords" isPill={campaign.type === 'Sponsored Brands'} query={query} onQuery={setQuery} onAdd={() => setIsAdding(true)} />
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr><th><input type="checkbox" aria-label="Select all" /></th><th>Active</th><th>Keyword</th><th>Target match type <Info size={13} /></th><th>Status <Info size={13} /></th>
-              <th className="is-num">Suggested bid <Info size={13} /></th><th className="is-num">Bid</th><MetricHeads /></tr>
-          </thead>
-          <tbody>
-            {rows.map(({ k, m }) => {
-              const s = suggestedFor(k);
-              return (
-                <tr key={k.id}>
-                  <td><input type="checkbox" aria-label="select" /></td>
-                  <td><button type="button" className={`cx-switch ${k.status === 'Enabled' ? 'is-on' : ''}`} aria-label={k.status}
-                    onClick={() => updateKeyword(k.id, { status: k.status === 'Enabled' ? 'Paused' : 'Enabled' })} /></td>
-                  <td>{k.keyword}</td>
-                  <td>{k.matchType}</td>
-                  <td><span className="cx-status">{status(k)}</span></td>
-                  <td className="is-num">
-                    ₹{s.sugg.toFixed(2)}
-                    <span className="cx-sub">₹{s.min.toFixed(2)} - ₹{s.max.toFixed(2)}</span>
-                    {Math.abs(k.bid - s.sugg) > 0.005 && <button type="button" className="cx-link" onClick={() => updateKeyword(k.id, { bid: Number(s.sugg.toFixed(2)) })}>Apply</button>}
-                  </td>
-                  <td className="is-num"><BidInput value={k.bid} onSave={(bid) => updateKeyword(k.id, { bid })} /></td>
-                  <MetricCells m={m} />
-                </tr>
-              );
-            })}
-            {rows.length === 0 && <tr><td colSpan={15}><div className="cx-empty"><h3>No keywords</h3><p>Add keywords to show your ads in shopper searches.</p></div></td></tr>}
-          </tbody>
-          {rows.length > 0 && <tfoot><tr><td colSpan={7}>Total: {rows.length}</td><MetricCells m={sumMetrics(rows.map(r => r.m))} /></tr></tfoot>}
-        </table>
-      </div>
+      <ConsoleTable
+        tableKey="keyword-targets"
+        exportName={`${adGroup.name} keywords`}
+        columns={columns}
+        rows={rows}
+        rowKey={r => r.k.id}
+        filterFields={fields}
+        initialFilters={[DEFAULT_STATUS_FILTER]}
+        search={{ placeholder: 'Find a target', match: (r, q) => r.k.keyword.toLowerCase().includes(q) }}
+        leftActions={pill('Add keywords', campaign.type === 'Sponsored Brands', () => setIsAdding(true))}
+        bulkSections={(sel, clear) => [statusBulkSection(sel.map(r => r.k), (k, st) => updateKeyword(k.id, { status: st }), clear)]}
+        empty={<div className="cx-empty"><h3>No keywords</h3><p>Add keywords to show your ads in shopper searches.</p></div>}
+      />
       {isAdding && (
         <AddKeywordsModal
           defaultBid={adGroup.defaultBid || 1}

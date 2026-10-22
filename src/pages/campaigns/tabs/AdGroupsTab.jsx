@@ -1,20 +1,24 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ListFilter, Copy, ChevronDown, Settings } from 'lucide-react';
-import Info from '../../../components/console/InfoGlyph';
 import { useStore } from '../../../store/useStore';
 import { adGroupPath, createAdGroupPath } from '../../../routes';
 import { useConsoleRange } from '../../../hooks/useConsoleRange';
 import { rangeMetrics, withParentStart } from '../../../utils/performance';
-import { formatMetric, METRICS } from '../../../components/console/metrics';
-import TableDateButton from '../../../components/console/TableDateButton';
+import ConsoleTable from '../../../components/console/table/ConsoleTable';
+import { ActiveSwitch } from '../../../components/console/table/InlineEdit';
+import { statusBulkSection } from '../../../components/console/table/bulkActions';
+import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
+import { DEFAULT_STATUS_FILTER, statusField, numberField } from '../../../components/console/table/tableFilters';
 import { effectiveCpc } from '../../builder/sd/launch';
 
-const METRIC_COLUMNS = {
+// Default metric columns per campaign type, as the console shows them; the rest are in "Customise columns".
+const DEFAULT_METRICS = {
   'Sponsored Products': ['spend', 'orders', 'sales', 'roas', 'impressions', 'clicks'],
   'Sponsored Brands': ['clicks', 'dpv', 'spend', 'orders', 'sales', 'acos'],
   'Sponsored Display': ['spend', 'impressions', 'clicks', 'ctr', 'dpv', 'orders'],
 };
+const ALL_METRICS = ['impressions', 'clicks', 'ctr', 'cpc', 'spend', 'orders', 'sales', 'acos', 'roas', 'dpv'];
+const AUTO_TARGET_GROUPS = 4; // close match, loose match, substitutes, complements
 
 function BidCell({ adGroup }) {
   const updateAdGroup = useStore(s => s.updateAdGroup);
@@ -65,88 +69,68 @@ export default function AdGroupsTab({ campaign }) {
   const sbAds = useStore(s => s.sbAds || []);
   const updateAdGroup = useStore(s => s.updateAdGroup);
   const range = useConsoleRange();
-  const [search, setSearch] = useState('');
 
   const isSB = campaign.type === 'Sponsored Brands';
   const isSD = campaign.type === 'Sponsored Display';
-  const columns = METRIC_COLUMNS[campaign.type] || METRIC_COLUMNS['Sponsored Products'];
+  const isAuto = campaign.type === 'Sponsored Products' && campaign.targetingType === 'Auto';
+  const defaults = DEFAULT_METRICS[campaign.type] || DEFAULT_METRICS['Sponsored Products'];
 
   const rows = useMemo(() => allAdGroups
     .filter(ag => ag.campaignId === campaign.id)
-    .filter(ag => !search || ag.name.toLowerCase().includes(search.toLowerCase()))
     .map(ag => ({ ag, m: rangeMetrics(withParentStart(ag, campaign), range) })),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [allAdGroups, campaign, search, range.from.getTime(), range.to.getTime()]);
+  [allAdGroups, campaign, range.from.getTime(), range.to.getTime()]);
 
-  const isAuto = campaign.type === 'Sponsored Products' && campaign.targetingType === 'Auto';
-  const AUTO_TARGET_GROUPS = 4; // close match, loose match, substitutes, complements
-  const targetCount = (ag) => {
-    if (isSD) return (campaign.sdTargets || []).length;
-    if (isAuto) return AUTO_TARGET_GROUPS;
-    return keywords.filter(k => k.adGroupId === ag.id).length;
-  };
-  const sbAdName = (ag) => sbAds.find(a => a.campaignId === campaign.id)?.name || campaign.sbCreative?.headline || ag.name;
+  const columns = useMemo(() => {
+    const targetCount = (ag) => {
+      if (isSD) return (campaign.sdTargets || []).length;
+      if (isAuto) return AUTO_TARGET_GROUPS;
+      return keywords.filter(k => k.adGroupId === ag.id).length;
+    };
+    const sbAdName = (ag) => sbAds.find(a => a.campaignId === campaign.id)?.name || campaign.sbCreative?.headline || ag.name;
+    return [
+      { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.ag.status,
+        cell: ({ ag }) => <ActiveSwitch isOn={ag.status === 'Enabled'} disabled={ag.status === 'Archived'} onToggle={() => updateAdGroup(ag.id, { status: ag.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
+      { key: 'name', label: 'Ad group name', fixed: true, info: true, csv: r => r.ag.name,
+        cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id)}>{ag.name}</Link> },
+      { key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: r => adGroupStatus(campaign, r.ag), cell: ({ ag }) => <span className="cx-status">{adGroupStatus(campaign, ag)}</span> },
+      ...(isSB ? [{ key: 'adName', label: 'Ad name', group: GROUPS.detail, info: true, csv: r => sbAdName(r.ag), cell: ({ ag }) => sbAdName(ag) }] : []),
+      ...(isSD ? [{ key: 'bidOpt', label: 'Bid optimisation', group: GROUPS.settings, info: true, csv: () => campaign.goal || '',
+        cell: () => ({ reach: 'Reach', conversion: 'Conversions' }[campaign.goal] || 'Page visits') }] : []),
+      ...(!isSB ? [{ key: 'bid', label: isSD ? 'Cost control' : 'Default bid', group: GROUPS.settings, num: true, info: true,
+        csv: r => (isSD ? campaign.costControlValue ?? '' : r.ag.defaultBid), sortValue: r => r.ag.defaultBid || 0,
+        cell: ({ ag }) => (isSD ? <CostControlCell campaign={campaign} /> : <BidCell adGroup={ag} />) }] : []),
+      { key: 'targets', label: isSB ? 'Targets' : 'Total targets', group: GROUPS.detail, num: true, info: true, csv: r => targetCount(r.ag), sortValue: r => targetCount(r.ag),
+        cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id, 'targeting')}>{targetCount(ag)}</Link> },
+      ...(!isSB ? [{ key: 'products', label: isSD ? 'Ads' : 'Products', group: GROUPS.detail, num: true, info: true, csv: r => (r.ag.products || []).length,
+        sortValue: r => (r.ag.products || []).length, cell: ({ ag }) => <Link className="cx-link" to={adGroupPath(campaign, ag.id, 'ads')}>{(ag.products || []).length}</Link> }] : []),
+      ...metricColumns([...defaults, ...ALL_METRICS.filter(k => !defaults.includes(k))], defaults),
+    ];
+  }, [campaign, isSB, isSD, isAuto, keywords, sbAds, defaults, updateAdGroup]);
+
+  const fields = useMemo(() => [
+    statusField(r => r.ag.status),
+    ...(!isSB && !isSD ? [numberField('bid', 'Default bid', r => r.ag.defaultBid || 0)] : []),
+    ...metricFilterFields(ALL_METRICS),
+  ], [isSB, isSD]);
 
   return (
-    <>
-      <div className="cx-toolbar">
+    <ConsoleTable
+      tableKey={`ad-groups-${campaign.type}`}
+      exportName={`${campaign.name} ad groups`}
+      columns={columns}
+      rows={rows}
+      rowKey={r => r.ag.id}
+      filterFields={fields}
+      initialFilters={[DEFAULT_STATUS_FILTER]}
+      search={{ placeholder: 'Find an ad group', match: (r, q) => r.ag.name.toLowerCase().includes(q) }}
+      leftActions={(
         <button type="button" className={isSB || isSD ? 'cx-btn cx-btn-pill' : 'cx-btn cx-btn-primary'} onClick={() => navigate(createAdGroupPath(campaign))}>
           Create ad group
         </button>
-        <label className="cx-search" style={{ width: 240 }}>
-          <Search size={16} />
-          <input placeholder="Find an ad group" value={search} onChange={e => setSearch(e.target.value)} />
-        </label>
-        <button type="button" className="cx-tool-btn" aria-label="Filter by"><ListFilter size={16} /></button>
-        <button type="button" className="cx-tool-btn" aria-label="Copy" disabled><Copy size={16} /></button>
-        <span className="cx-toolbar-spacer" />
-        <button type="button" className="cx-tool-btn">View: Default <ChevronDown size={14} /></button>
-        <button type="button" className="cx-tool-btn">Columns <ChevronDown size={14} /></button>
-        <TableDateButton />
-        <button type="button" className="cx-tool-btn" aria-label="Table settings"><Settings size={16} /></button>
-        <button type="button" className="cx-tool-btn">Export</button>
-      </div>
-
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr>
-              <th><input type="checkbox" aria-label="Select all" /></th>
-              <th>Active</th>
-              <th>Ad group name <Info size={13} /></th>
-              <th>Status <Info size={13} /></th>
-              {isSB && <th>Ad name <Info size={13} /></th>}
-              {isSD && <th>Bid optimisation <Info size={13} /></th>}
-              {!isSB && <th className="is-num">{isSD ? 'Cost control' : 'Default bid'} <Info size={13} /></th>}
-              <th className="is-num">{isSB ? 'Targets' : 'Total targets'} <Info size={13} /></th>
-              {!isSB && <th className="is-num">{isSD ? 'Ads' : 'Products'} <Info size={13} /></th>}
-              {columns.map(k => <th key={k} className="is-num">{METRICS[k].label} <Info size={13} /></th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ ag, m }) => (
-              <tr key={ag.id}>
-                <td><input type="checkbox" aria-label="select" /></td>
-                <td>
-                  <button type="button" className={`cx-switch ${ag.status === 'Enabled' ? 'is-on' : ''}`} aria-label={ag.status}
-                    onClick={() => updateAdGroup(ag.id, { status: ag.status === 'Enabled' ? 'Paused' : 'Enabled' })} />
-                </td>
-                <td><Link className="cx-link" to={adGroupPath(campaign, ag.id)}>{ag.name}</Link></td>
-                <td><span className="cx-status">{adGroupStatus(campaign, ag)}</span></td>
-                {isSB && <td>{sbAdName(ag)}</td>}
-                {isSD && <td>{{ reach: 'Reach', conversion: 'Conversions' }[campaign.goal] || 'Page visits'}</td>}
-                {!isSB && <td className="is-num">{isSD ? <CostControlCell campaign={campaign} /> : <BidCell adGroup={ag} />}</td>}
-                <td className="is-num"><Link className="cx-link" to={adGroupPath(campaign, ag.id, 'targeting')}>{targetCount(ag)}</Link></td>
-                {!isSB && <td className="is-num"><Link className="cx-link" to={adGroupPath(campaign, ag.id, 'ads')}>{(ag.products || []).length}</Link></td>}
-                {columns.map(k => <td key={k} className="is-num">{m[k] ? formatMetric(k, m[k]) : '—'}</td>)}
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={12}><div className="cx-empty"><h3>No ad groups</h3><p>Create an ad group to start advertising.</p></div></td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </>
+      )}
+      bulkSections={(sel, clear) => [statusBulkSection(sel.map(r => r.ag), (ag, status) => updateAdGroup(ag.id, { status }), clear)]}
+      empty={<div className="cx-empty"><h3>No ad groups</h3><p>Create an ad group to start advertising.</p></div>}
+    />
   );
 }

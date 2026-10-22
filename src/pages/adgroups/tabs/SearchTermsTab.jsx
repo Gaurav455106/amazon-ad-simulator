@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react';
-import { Search, ListFilter, ChevronDown } from 'lucide-react';
-import Info from '../../../components/console/InfoGlyph';
+import { useMemo } from 'react';
 import { useStore } from '../../../store/useStore';
 import { useConsoleRange } from '../../../hooks/useConsoleRange';
 import { rangeMetrics, withParentStart } from '../../../utils/performance';
 import { buildSearchTerms } from '../../../utils/searchTerms';
-import { formatMetric, METRICS } from '../../../components/console/metrics';
 import { formatCurrency } from '../../../utils/simulation';
-import TableDateButton from '../../../components/console/TableDateButton';
+import ConsoleTable from '../../../components/console/table/ConsoleTable';
+import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
+import { choiceField, numberField } from '../../../components/console/table/tableFilters';
 
-const METRIC_COLUMNS = ['spend', 'orders', 'sales', 'acos', 'impressions', 'clicks', 'ctr'];
+const METRIC_KEYS = ['spend', 'orders', 'sales', 'acos', 'impressions', 'clicks', 'ctr', 'cpc', 'roas'];
+const DEFAULT_METRICS = ['spend', 'orders', 'sales', 'acos', 'impressions', 'clicks', 'ctr'];
+const MATCH_TYPES = ['Exact', 'Phrase', 'Broad'].map(v => ({ value: v, label: v }));
 
 export default function SearchTermsTab({ campaign, adGroup }) {
   const keywords = useStore(s => s.keywords);
@@ -17,14 +18,13 @@ export default function SearchTermsTab({ campaign, adGroup }) {
   const addKeywords = useStore(s => s.addKeywords);
   const addNegativeKeywords = useStore(s => s.addNegativeKeywords);
   const range = useConsoleRange();
-  const [query, setQuery] = useState('');
 
   const agKeywords = keywords.filter(k => k.adGroupId === adGroup.id);
   const terms = useMemo(() => buildSearchTerms(agKeywords.map(k => ({ k, m: rangeMetrics(withParentStart(k, campaign), range) })))
     .filter(t => t.impressions >= 1)
-    .filter(t => !query || t.term.includes(query.toLowerCase())),
+    .map(t => ({ ...t, m: t })),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [keywords, adGroup.id, query, campaign.startDate, range.from.getTime(), range.to.getTime()]);
+  [keywords, adGroup.id, campaign.startDate, range.from.getTime(), range.to.getTime()]);
 
   const addedAs = (term) => {
     const tags = [];
@@ -32,48 +32,36 @@ export default function SearchTermsTab({ campaign, adGroup }) {
     if (negativeKeywords.some(n => n.campaignId === campaign.id && n.keyword === term)) tags.push('Negative');
     return tags;
   };
-
   const addAsKeyword = (t) => addKeywords([{ keyword: t.term, matchType: 'Exact', bid: t.keyword.bid, adGroupId: adGroup.id, campaignId: campaign.id, status: 'Enabled' }]);
   const addAsNegative = (t) => addNegativeKeywords([{ keyword: t.term, matchType: 'Exact', campaignId: campaign.id, adGroupId: adGroup.id, level: 'Ad Group' }]);
 
+  const columns = [
+    { key: 'actions', label: 'Actions', fixed: true, isUtility: true,
+      cell: (t) => {
+        const tags = addedAs(t.term);
+        return (
+          <span className="st-actions">
+            {!tags.includes('Keyword (exact)') && <button type="button" className="cx-link" onClick={() => addAsKeyword(t)}>Add as keyword</button>}
+            {!tags.includes('Negative') && <button type="button" className="cx-link" onClick={() => addAsNegative(t)}>Add as negative</button>}
+          </span>
+        );
+      } },
+    { key: 'addedAs', label: 'Added as', fixed: true, csv: t => addedAs(t.term).join('; '), cell: t => addedAs(t.term).join(', ') || '—' },
+    { key: 'term', label: 'Customer search term', fixed: true, info: true, csv: t => t.term, cell: t => t.term },
+    { key: 'keyword', label: 'Keywords', group: GROUPS.detail, info: true, csv: t => `${t.keyword.keyword} (${t.keyword.matchType})`,
+      cell: t => <>{t.keyword.keyword}<span className="cx-sub">{t.keyword.matchType}</span></> },
+    { key: 'bid', label: 'Target bid', group: GROUPS.settings, num: true, info: true, csv: t => t.keyword.bid, sortValue: t => t.keyword.bid, cell: t => formatCurrency(t.keyword.bid) },
+    ...metricColumns(METRIC_KEYS, DEFAULT_METRICS),
+  ];
+  const fields = [
+    choiceField('matchType', 'Match type', MATCH_TYPES, t => t.keyword.matchType),
+    numberField('bid', 'Target bid', t => t.keyword.bid),
+    ...metricFilterFields(METRIC_KEYS),
+  ];
+
   return (
-    <>
-      <div className="cx-toolbar">
-        <label className="cx-search" style={{ width: 240 }}><Search size={16} /><input placeholder="Find a search term" value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <button type="button" className="cx-tool-btn" aria-label="Filter by"><ListFilter size={16} /></button>
-        <span className="cx-toolbar-spacer" />
-        <button type="button" className="cx-tool-btn">View: Default <ChevronDown size={14} /></button>
-        <button type="button" className="cx-tool-btn">Columns <ChevronDown size={14} /></button>
-        <TableDateButton />
-        <button type="button" className="cx-tool-btn">Export</button>
-      </div>
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr><th>Actions</th><th>Added as</th><th>Customer search term <Info size={13} /></th><th>Keywords <Info size={13} /></th><th className="is-num"><Info size={13} /> Target bid</th>
-              {METRIC_COLUMNS.map(k => <th key={k} className="is-num"><Info size={13} /> {METRICS[k].label}</th>)}</tr>
-          </thead>
-          <tbody>
-            {terms.map(t => {
-              const tags = addedAs(t.term);
-              return (
-                <tr key={t.id}>
-                  <td className="st-actions">
-                    {!tags.includes('Keyword (exact)') && <button type="button" className="cx-link" onClick={() => addAsKeyword(t)}>Add as keyword</button>}
-                    {!tags.includes('Negative') && <button type="button" className="cx-link" onClick={() => addAsNegative(t)}>Add as negative</button>}
-                  </td>
-                  <td>{tags.length ? tags.join(', ') : '—'}</td>
-                  <td>{t.term}</td>
-                  <td>{t.keyword.keyword}<span className="cx-sub">{t.keyword.matchType}</span></td>
-                  <td className="is-num">{formatCurrency(t.keyword.bid)}</td>
-                  {METRIC_COLUMNS.map(k => <td key={k} className="is-num">{t[k] ? formatMetric(k, t[k]) : '—'}</td>)}
-                </tr>
-              );
-            })}
-            {terms.length === 0 && <tr><td colSpan={12}><div className="cx-empty"><h3>No data available</h3><p>Please try adjusting your filters to see performance data</p></div></td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <ConsoleTable tableKey="search-terms" exportName={`${adGroup.name} search terms`} columns={columns} rows={terms} rowKey={t => t.id}
+      filterFields={fields} showSettings={false}
+      search={{ placeholder: 'Find a search term', match: (t, q) => t.term.includes(q) }} />
   );
 }

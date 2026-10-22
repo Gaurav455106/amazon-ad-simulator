@@ -2,37 +2,24 @@ import { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import DateRangePicker from '../../components/DateRangePicker';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Download, Plus, FileText } from 'lucide-react';
-import { formatCurrency, formatNumber, formatPercent } from '../../utils/simulation';
+import { Plus, FileText } from 'lucide-react';
+import ReportTable from './ReportTable';
+import { REPORT_TYPES } from './reportData';
 
 const COLORS = ['#e47911', '#232f3e', '#f9a825', '#00897b', '#6a1b9a'];
-
-const REPORT_TYPES = [
-  'Campaign performance', 'Ad group performance', 'Keyword performance',
-  'Search term report', 'Product ads report', 'Placement report', 'Advertised product report'
-];
 
 export default function Reports() {
   const campaigns = useStore(s => s.campaigns);
   const chartData = useStore(s => s.chartData);
-  const [activeReport, setActiveReport] = useState('Campaign performance');
+  const [activeReport, setActiveReport] = useState('campaign');
+  const [scheduledName, setScheduledName] = useState('');
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ name: '', type: 'Campaign performance', frequency: 'Daily', email: '' });
+  const [scheduleForm, setScheduleForm] = useState({ name: '', type: 'campaign', frequency: 'Daily', email: '' });
 
   const pieData = campaigns.map(c => ({
     name: c.name.substring(0, 20),
     value: parseFloat(c.metrics.spend.toFixed(2))
   }));
-
-  const placementData = [
-    { placement: 'Top of search (first page)', impressions: 28400, clicks: 920, spend: 32.40, orders: 52, ctr: 3.24, acos: 13.2 },
-    { placement: 'Rest of search', impressions: 19600, clicks: 540, spend: 18.20, orders: 28, ctr: 2.76, acos: 18.7 },
-    { placement: 'Product pages', impressions: 11200, clicks: 220, spend: 8.90, orders: 11, ctr: 1.96, acos: 24.1 },
-  ];
-
-  const handleDownload = (format) => {
-    alert(`Downloading ${activeReport} as ${format}... (simulation)`);
-  };
 
   return (
     <div className="page">
@@ -43,8 +30,6 @@ export default function Reports() {
         </div>
         <div className="page-actions">
           <DateRangePicker />
-          <button className="btn btn-secondary" onClick={() => handleDownload('CSV')}><Download size={14} /> CSV</button>
-          <button className="btn btn-secondary" onClick={() => handleDownload('Excel')}><Download size={14} /> Excel</button>
           <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14} /> Schedule report</button>
         </div>
       </div>
@@ -52,8 +37,8 @@ export default function Reports() {
       {/* Report type selector */}
       <div className="report-type-tabs">
         {REPORT_TYPES.map(r => (
-          <button key={r} className={`report-type-tab ${activeReport === r ? 'active' : ''}`} onClick={() => setActiveReport(r)}>
-            <FileText size={13} /> {r}
+          <button key={r.key} className={`report-type-tab ${activeReport === r.key ? 'active' : ''}`} onClick={() => setActiveReport(r.key)}>
+            <FileText size={13} /> {r.label}
           </button>
         ))}
       </div>
@@ -111,62 +96,10 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Placement Report */}
-      {activeReport === 'Placement report' && (
-        <div className="table-card">
-          <h3 className="section-title">Placement performance</h3>
-          <table className="ads-table">
-            <thead>
-              <tr>
-                <th>Placement</th><th>Impressions</th><th>Clicks</th><th>CTR</th>
-                <th>Spend</th><th>Orders</th><th>ACOS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {placementData.map(p => (
-                <tr key={p.placement}>
-                  <td>{p.placement}</td>
-                  <td>{formatNumber(p.impressions)}</td>
-                  <td>{formatNumber(p.clicks)}</td>
-                  <td>{formatPercent(p.ctr)}</td>
-                  <td>{formatCurrency(p.spend)}</td>
-                  <td>{p.orders}</td>
-                  <td className={p.acos > 25 ? 'bad-metric' : p.acos < 15 ? 'good-metric' : ''}>{formatPercent(p.acos)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Campaign Performance Table */}
-      <div className="table-card">
-        <h3 className="section-title">{activeReport}</h3>
-        <table className="ads-table">
-          <thead>
-            <tr>
-              <th>Campaign</th><th>Status</th><th>Impressions</th><th>Clicks</th>
-              <th>CTR</th><th>Spend</th><th>CPC</th><th>Orders</th><th>Sales</th><th>ACOS</th><th>ROAS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {campaigns.map(c => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td><span className={`status-dot ${c.status === 'Enabled' ? 'green' : 'yellow'}`} />{c.status}</td>
-                <td>{formatNumber(c.metrics.impressions)}</td>
-                <td>{formatNumber(c.metrics.clicks)}</td>
-                <td>{formatPercent(c.metrics.ctr)}</td>
-                <td>{formatCurrency(c.metrics.spend)}</td>
-                <td>{formatCurrency(c.metrics.cpc)}</td>
-                <td>{formatNumber(c.metrics.orders)}</td>
-                <td>{formatCurrency(c.metrics.sales)}</td>
-                <td className={c.metrics.acos > 30 ? 'bad-metric' : c.metrics.acos < 15 ? 'good-metric' : ''}>{formatPercent(c.metrics.acos)}</td>
-                <td>{Number(c.metrics.roas || 0).toFixed(2)}x</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {scheduledName && <p className="report-note" role="status">Scheduled “{scheduledName}”. In the simulator it isn't emailed; download it any time with Export.</p>}
+      <div className="table-card report-table">
+        <h3 className="section-title">{REPORT_TYPES.find(r => r.key === activeReport)?.label}</h3>
+        <ReportTable type={activeReport} />
       </div>
 
       {showSchedule && (
@@ -185,7 +118,7 @@ export default function Reports() {
                 <div className="form-group">
                   <label>Report type</label>
                   <select className="form-input" value={scheduleForm.type} onChange={e => setScheduleForm(f => ({ ...f, type: e.target.value }))}>
-                    {REPORT_TYPES.map(r => <option key={r}>{r}</option>)}
+                    {REPORT_TYPES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -202,7 +135,7 @@ export default function Reports() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowSchedule(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => { alert('Report scheduled!'); setShowSchedule(false); }}>Schedule</button>
+              <button className="btn btn-primary" onClick={() => { setScheduledName(scheduleForm.name || REPORT_TYPES.find(r => r.key === scheduleForm.type)?.label); setShowSchedule(false); }}>Schedule</button>
             </div>
           </div>
         </div>

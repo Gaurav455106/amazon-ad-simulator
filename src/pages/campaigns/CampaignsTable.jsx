@@ -1,18 +1,26 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { EllipsisVertical, TriangleAlert, ArrowDown, ArrowUp } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { EllipsisVertical, TriangleAlert } from 'lucide-react';
 import Info from '../../components/console/InfoGlyph';
 import { useStore } from '../../store/useStore';
-import { campaignPath } from '../../routes';
+import { campaignPath, ROUTES } from '../../routes';
 import { consoleId } from '../../utils/consoleId';
 import { formatCurrency } from '../../utils/simulation';
 import { deliveryStatus, STATUS_TONE } from '../../utils/campaignStatus';
-import { METRICS, formatMetric } from '../../components/console/metrics';
-import Pagination from '../../components/console/Pagination';
+import { localISODate } from '../../utils/dateRanges';
+import ConsoleTable from '../../components/console/table/ConsoleTable';
+import InlineNumber, { ActiveSwitch } from '../../components/console/table/InlineEdit';
+import BulkValueDialog from '../../components/console/table/BulkValueDialog';
+import { statusBulkSection } from '../../components/console/table/bulkActions';
+import { GROUPS, metricColumns, metricFilterFields } from '../../components/console/table/columns';
+import { DEFAULT_STATUS_FILTER, statusField, numberField, choiceField } from '../../components/console/table/tableFilters';
 
-const METRIC_COLUMNS = ['clicks', 'spend', 'orders', 'sales', 'acos', 'roas', 'impressions', 'ctr', 'cpc'];
-const DEFAULT_PAGE_SIZE = 50;
 const TARGETING_LABEL = { Auto: 'Automatic Targeting', Manual: 'Manual Targeting' };
+const MAX_TOP_OF_SEARCH = 900;
+const MIN_BUDGET = 1;
+// Console defaults: Clicks, CTR, CPC and Total cost; the rest are added from "Customise columns".
+const METRIC_KEYS = ['clicks', 'ctr', 'cpc', 'spend', 'impressions', 'orders', 'sales', 'acos', 'roas'];
+const DEFAULT_METRICS = ['clicks', 'ctr', 'cpc', 'spend'];
 
 const shortDate = (iso) => {
   if (!iso) return null;
@@ -20,52 +28,20 @@ const shortDate = (iso) => {
   return `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}, ${d.getFullYear()}`;
 };
 
-function InlineNumber({ value, suffix, prefix, onSave, width }) {
-  const [draft, setDraft] = useState(null);
-  if (draft === null) {
-    return (
-      <button type="button" className="cx-cell-box" onClick={() => setDraft(String(value ?? ''))}>
-        {prefix}{value}{suffix}
-      </button>
-    );
-  }
-  const commit = () => {
-    const n = parseFloat(draft);
-    if (!Number.isNaN(n) && n >= 0) onSave(n);
-    setDraft(null);
-  };
-  return (
-    <input
-      autoFocus
-      className="cx-cell-input"
-      style={width ? { width } : undefined}
-      value={draft}
-      onChange={e => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }}
-    />
-  );
-}
-
 function RowMenu({ campaign }) {
   const [isOpen, setIsOpen] = useState(false);
   const updateCampaign = useStore(s => s.updateCampaign);
-  const isArchived = campaign.status === 'Archived';
   return (
     <span className="cx-pop-anchor">
-      <button type="button" className="cx-tool-btn" aria-label="Campaign actions" onClick={() => setIsOpen(true)}>
-        <EllipsisVertical size={16} />
-      </button>
+      <button type="button" className="cx-tool-btn" aria-label="Campaign actions" onClick={() => setIsOpen(true)}><EllipsisVertical size={16} /></button>
       {isOpen && (
         <>
           <div className="drp-scrim" onClick={() => setIsOpen(false)} />
           <div className="cx-pop" style={{ left: 0, top: 30 }}>
             <Link className="cx-pop-item" to={campaignPath(campaign)}>View ad groups</Link>
             <Link className="cx-pop-item" to={campaignPath(campaign, 'settings')}>Edit campaign settings</Link>
-            {!isArchived && (
-              <button type="button" className="cx-pop-item" onClick={() => { updateCampaign(campaign.id, { status: 'Archived' }); setIsOpen(false); }}>
-                Archive
-              </button>
+            {campaign.status !== 'Archived' && (
+              <button type="button" className="cx-pop-item" onClick={() => { updateCampaign(campaign.id, { status: 'Archived' }); setIsOpen(false); }}>Archive</button>
             )}
           </div>
         </>
@@ -74,132 +50,135 @@ function RowMenu({ campaign }) {
   );
 }
 
-/**
- * @param {{ rows: Array<{ campaign: object, m: object }> }} props
- *   rows: campaigns paired with their metrics for the selected date range
- */
-export default function CampaignsTable({ rows, selected, onSelectedChange }) {
+function useCampaignColumns(portfolios) {
   const toggleCampaignStatus = useStore(s => s.toggleCampaignStatus);
   const updateCampaign = useStore(s => s.updateCampaign);
-  const [sort, setSort] = useState({ key: null, dir: 'desc' });
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  return useMemo(() => {
+    const portfolioName = (c) => portfolios.find(p => p.id === c.portfolioId)?.name || '—';
+    return [
+      { key: 'alerts', label: 'Alerts', header: <TriangleAlert size={14} aria-label="Alerts" />, fixed: true, isUtility: true, cell: () => null },
+      { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => r.campaign.status,
+        cell: ({ campaign: c }) => <ActiveSwitch isOn={c.status === 'Enabled'} disabled={c.status === 'Archived'} onToggle={() => toggleCampaignStatus(c.id)} /> },
+      { key: 'name', label: 'Campaign name', fixed: true, info: true, csv: r => r.campaign.name,
+        cell: ({ campaign: c }) => (
+          <div className="cx-name-flex">
+            <div><Link className="cx-link" to={campaignPath(c)}>{c.name}</Link><span className="cx-id">{consoleId(c.id)}</span></div>
+            <RowMenu campaign={c} />
+          </div>
+        ) },
+      { key: 'country', label: 'Campaign country', group: GROUPS.detail, csv: () => 'India', cell: () => 'India' },
+      { key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: r => deliveryStatus(r.campaign),
+        cell: ({ campaign: c }) => { const s = deliveryStatus(c); return <span className={`cx-status ${STATUS_TONE[s]}`}>{s} <Info size={13} /></span>; } },
+      { key: 'type', label: 'Type', group: GROUPS.settings, info: true, csv: r => r.campaign.type,
+        cell: ({ campaign: c }) => <>{c.type}<span className="cx-sub">{TARGETING_LABEL[c.targetingType] || c.targetingType}</span></> },
+      { key: 'startDate', label: 'Campaign start date', group: GROUPS.detail, info: true, csv: r => r.campaign.startDate,
+        cell: ({ campaign: c }) => <span className="cx-cell-box is-muted">{shortDate(c.startDate) || '—'}</span> },
+      { key: 'endDate', label: 'Campaign end date', group: GROUPS.detail, info: true, csv: r => r.campaign.endDate || 'No End Date',
+        cell: ({ campaign: c }) => <span className="cx-cell-box">{shortDate(c.endDate) || 'No End Date'}</span> },
+      { key: 'topOfSearch', label: 'Top-of-search bid adjustment', group: GROUPS.settings, num: true, csv: r => r.campaign.placementAdjustments?.top ?? 0,
+        sortValue: r => r.campaign.placementAdjustments?.top ?? 0,
+        cell: ({ campaign: c }) => (c.type === 'Sponsored Display' ? '—' : (
+          <InlineNumber display={`${c.placementAdjustments?.top ?? 0}%`} initial={String(c.placementAdjustments?.top ?? 0)} width={70}
+            onSave={n => updateCampaign(c.id, { placementAdjustments: { ...(c.placementAdjustments || {}), top: Math.min(MAX_TOP_OF_SEARCH, Math.round(n)) } })} />
+        )) },
+      { key: 'budget', label: 'Campaign budget amount', group: GROUPS.detail, num: true, csv: r => Number(r.campaign.budget),
+        sortValue: r => Number(r.campaign.budget) || 0,
+        total: rows => formatCurrency(rows.reduce((s, r) => s + Number(r.campaign.budget || 0), 0)),
+        cell: ({ campaign: c }) => (
+          <InlineNumber display={`₹${Number(c.budget).toFixed(2)} - ${(c.budgetType || 'Daily').toLowerCase()}`} initial={Number(c.budget).toFixed(2)}
+            min={MIN_BUDGET} onSave={n => updateCampaign(c.id, { budget: n })} />
+        ) },
+      ...metricColumns(METRIC_KEYS, DEFAULT_METRICS),
+      { key: 'portfolio', label: 'Portfolio name', group: GROUPS.detail, isDefault: false, csv: r => portfolioName(r.campaign), cell: r => portfolioName(r.campaign) },
+      { key: 'bidStrategy', label: 'Campaign bid strategy', group: GROUPS.detail, isDefault: false, csv: r => r.campaign.biddingStrategy || '',
+        cell: r => r.campaign.biddingStrategy || '—' },
+      { key: 'costType', label: 'Cost type', group: GROUPS.settings, isDefault: false, csv: r => r.campaign.costType || 'CPC', cell: r => r.campaign.costType || 'CPC' },
+    ];
+  }, [portfolios, toggleCampaignStatus, updateCampaign]);
+}
 
-  const sorted = useMemo(() => {
-    if (!sort.key) return rows;
-    const val = (r) => (sort.key === 'budget' ? r.campaign.budget : r.m[sort.key]);
-    return [...rows].sort((a, b) => (sort.dir === 'desc' ? val(b) - val(a) : val(a) - val(b)));
-  }, [rows, sort]);
+function campaignFilterFields(portfolios) {
+  return [
+    choiceField('country', 'Campaign country', [{ value: 'India', label: 'India' }], () => 'India'),
+    statusField(r => r.campaign.status),
+    choiceField('portfolio', 'Portfolio name', [{ value: 'none', label: 'No portfolio' }, ...portfolios.map(p => ({ value: p.id, label: p.name }))],
+      r => r.campaign.portfolioId || 'none', true),
+    numberField('budget', 'Campaign budget amount', r => Number(r.campaign.budget) || 0),
+    ...metricFilterFields(['impressions', 'clicks', 'ctr', 'cpc', 'spend', 'orders', 'sales', 'acos', 'roas']),
+    choiceField('targeting', 'Targeting', [{ value: 'Manual', label: 'Manual Targeting' }, { value: 'Auto', label: 'Automatic Targeting' }],
+      r => (r.campaign.targetingType === 'Auto' ? 'Auto' : 'Manual')),
+    choiceField('outOfBudget', 'Out of budget', [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }],
+      r => (deliveryStatus(r.campaign) === 'Out of budget' ? 'yes' : 'no')),
+  ];
+}
 
-  const visible = sorted.slice(page * pageSize, (page + 1) * pageSize);
-  const allSelected = visible.length > 0 && visible.every(r => selected.includes(r.campaign.id));
-  const totals = useMemo(() => {
-    const t = { clicks: 0, spend: 0, orders: 0, sales: 0, impressions: 0 };
-    rows.forEach(r => Object.keys(t).forEach(k => { t[k] += r.m[k]; }));
-    return { ...t, acos: t.sales ? t.spend / t.sales * 100 : 0, roas: t.spend ? t.sales / t.spend : 0, ctr: t.impressions ? t.clicks / t.impressions * 100 : 0, cpc: t.clicks ? t.spend / t.clicks : 0 };
-  }, [rows]);
+const BULK_DIALOGS = {
+  budget: { title: 'Update budget', label: 'Daily budget (₹)', type: 'number', validate: v => (Number(v) >= MIN_BUDGET ? null : `Enter a budget of at least ₹${MIN_BUDGET}.00.`) },
+  endDate: { title: 'Update end date', label: 'End date', type: 'date', validate: v => (v >= localISODate() ? null : 'The end date can’t be in the past.') },
+  portfolio: { title: 'Move to portfolio', label: 'Portfolio', type: 'select' },
+};
 
-  const toggleSort = (key) => setSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
-  const sortIcon = (key) => (sort.key === key ? (sort.dir === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />) : null);
-  const toggleRow = (id) => onSelectedChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
-  const toggleAllVisible = () => onSelectedChange(allSelected ? [] : visible.map(r => r.campaign.id));
+/**
+ * Campaigns table with the console toolbar.
+ * @param {{ rows: Array<{ campaign: object, m: object }>, extraFilterPills?: object[] }} props
+ */
+export default function CampaignsTable({ rows, extraFilterPills }) {
+  const navigate = useNavigate();
+  const portfolios = useStore(s => s.portfolios);
+  const updateCampaign = useStore(s => s.updateCampaign);
+  const columns = useCampaignColumns(portfolios);
+  const filterFields = useMemo(() => campaignFilterFields(portfolios), [portfolios]);
+  const [dialog, setDialog] = useState(null); // { kind, ids }
+
+  const bulkSections = (selectedRows, clear) => {
+    const items = selectedRows.map(r => r.campaign);
+    const today = localISODate();
+    const open = (kind) => setDialog({ kind, ids: items.map(c => c.id), clear });
+    return [
+      statusBulkSection(items, (c, status) => updateCampaign(c.id, { status }), clear),
+      { title: 'Campaign details', items: [
+        { label: 'View targets', onClick: () => navigate(ROUTES.targetsView) },
+        { label: 'View ad groups', onClick: () => navigate(items.length === 1 ? campaignPath(items[0]) : ROUTES.adGroupsView) },
+      ] },
+      { title: 'Update', items: [
+        { label: 'Start date', disabled: items.some(c => c.startDate && c.startDate <= today), onClick: () => {} },
+        { label: 'End date', onClick: () => open('endDate') },
+        { label: 'Budget', onClick: () => open('budget') },
+      ] },
+      { title: 'Portfolio', items: [
+        { label: 'Move to portfolio', disabled: portfolios.length === 0, onClick: () => open('portfolio') },
+        { label: 'Remove from portfolio', disabled: items.every(c => !c.portfolioId), onClick: () => { items.forEach(c => updateCampaign(c.id, { portfolioId: '' })); clear(); } },
+        { label: 'Create portfolio', onClick: () => navigate(ROUTES.portfolios) },
+      ] },
+    ];
+  };
+
+  const applyDialog = (value) => {
+    const patch = { budget: { budget: Number(value) }, endDate: { endDate: value }, portfolio: { portfolioId: value } }[dialog.kind];
+    dialog.ids.forEach(id => updateCampaign(id, patch));
+    dialog.clear();
+  };
 
   return (
     <>
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr>
-              <th><input type="checkbox" aria-label="Select all" checked={allSelected} onChange={toggleAllVisible} /></th>
-              <th aria-label="Alerts"><TriangleAlert size={14} /></th>
-              <th>Active</th>
-              <th>Campaign name <Info size={13} /></th>
-              <th>Campaign<br />country</th>
-              <th>Status <Info size={13} /></th>
-              <th>Type <Info size={13} /></th>
-              <th>Campaign start<br />date</th>
-              <th>Campaign end<br />date</th>
-              <th className="is-num">Top-of-search bid<br />adjustment</th>
-              <th className="is-num is-sortable" onClick={() => toggleSort('budget')}>Campaign budget<br />amount {sortIcon('budget')}</th>
-              {METRIC_COLUMNS.map(k => (
-                <th key={k} className="is-num is-sortable" onClick={() => toggleSort(k)}>{METRICS[k].label} {sortIcon(k)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map(({ campaign: c, m }) => {
-              const status = deliveryStatus(c);
-              const isOn = c.status === 'Enabled';
-              return (
-                <tr key={c.id} className={selected.includes(c.id) ? 'is-selected' : ''}>
-                  <td><input type="checkbox" aria-label="select" checked={selected.includes(c.id)} onChange={() => toggleRow(c.id)} /></td>
-                  <td />
-                  <td>
-                    <button
-                      type="button"
-                      className={`cx-switch ${isOn ? 'is-on' : ''}`}
-                      aria-label={isOn ? 'Enabled' : 'Paused'}
-                      disabled={c.status === 'Archived'}
-                      onClick={() => toggleCampaignStatus(c.id)}
-                    />
-                  </td>
-                  <td className="cx-name-cell">
-                    <div className="cx-name-flex">
-                      <div>
-                        <Link className="cx-link" to={campaignPath(c)}>{c.name}</Link>
-                        <span className="cx-id">{consoleId(c.id)}</span>
-                      </div>
-                      <RowMenu campaign={c} />
-                    </div>
-                  </td>
-                  <td>India</td>
-                  <td><span className={`cx-status ${STATUS_TONE[status]}`}>{status} <Info size={13} /></span></td>
-                  <td>
-                    {c.type}
-                    <span className="cx-sub">{TARGETING_LABEL[c.targetingType] || c.targetingType}</span>
-                  </td>
-                  <td><span className="cx-cell-box is-muted">{shortDate(c.startDate) || '—'}</span></td>
-                  <td><span className="cx-cell-box">{shortDate(c.endDate) || 'No End Date'}</span></td>
-                  <td className="is-num">
-                    {c.type === 'Sponsored Display' ? '—' : (
-                      <InlineNumber
-                        value={c.placementAdjustments?.top ?? 0}
-                        suffix="%"
-                        width={70}
-                        onSave={(n) => updateCampaign(c.id, { placementAdjustments: { ...(c.placementAdjustments || {}), top: Math.min(900, n) } })}
-                      />
-                    )}
-                  </td>
-                  <td className="is-num">
-                    <InlineNumber
-                      value={Number(c.budget).toFixed(2)}
-                      prefix="₹"
-                      suffix={` - ${(c.budgetType || 'Daily').toLowerCase()}`}
-                      onSave={(n) => n >= 1 && updateCampaign(c.id, { budget: n })}
-                    />
-                  </td>
-                  {METRIC_COLUMNS.map(k => (
-                    <td key={k} className="is-num">{m[k] ? formatMetric(k, m[k]) : '—'}</td>
-                  ))}
-                </tr>
-              );
-            })}
-            {visible.length === 0 && (
-              <tr><td colSpan={11 + METRIC_COLUMNS.length}><div className="cx-empty"><h3>No campaigns</h3><p>Try adjusting your filters or create a campaign.</p></div></td></tr>
-            )}
-          </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr>
-                <td colSpan={10}>Total: {rows.length}</td>
-                <td className="is-num">{formatCurrency(rows.reduce((s, r) => s + Number(r.campaign.budget || 0), 0))}</td>
-                {METRIC_COLUMNS.map(k => <td key={k} className="is-num">{totals[k] ? formatMetric(k, totals[k]) : '—'}</td>)}
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-      <Pagination total={rows.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+      <ConsoleTable
+        tableKey="campaigns"
+        exportName="Campaigns"
+        columns={columns}
+        rows={rows}
+        rowKey={r => r.campaign.id}
+        filterFields={filterFields}
+        initialFilters={[DEFAULT_STATUS_FILTER]}
+        extraFilterPills={extraFilterPills}
+        search={{ placeholder: 'Search by name or ID', match: (r, q) => r.campaign.name.toLowerCase().includes(q) || consoleId(r.campaign.id).toLowerCase().includes(q) }}
+        leftActions={<button type="button" className="cx-btn cx-btn-primary" onClick={() => navigate(ROUTES.createCampaign)}>Create campaign</button>}
+        bulkSections={bulkSections}
+        empty={<div className="cx-empty"><h3>No campaigns</h3><p>Try adjusting your filters or create a campaign.</p></div>}
+      />
+      {dialog && (
+        <BulkValueDialog {...BULK_DIALOGS[dialog.kind]} options={portfolios.map(p => ({ value: p.id, label: p.name }))}
+          onApply={applyDialog} onClose={() => setDialog(null)} />
+      )}
     </>
   );
 }

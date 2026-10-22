@@ -123,8 +123,10 @@
 .radio-row small { color: var(--c-muted); font-size: 12px; max-width: 560px; }
 .settings-inline { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .settings-subhead { margin: 18px 0 2px; font-size: 14px; }
-.placement-row { display: grid; grid-template-columns: 200px auto; align-items: center; gap: 12px; margin: 8px 0; font-size: 13px; }
-.placement-row .cx-input-prefix input { width: 60px; }
+.placement-row { display: grid; grid-template-columns: 200px 128px; align-items: center; gap: 12px; margin: 8px 0; font-size: 14px; }
+.placement-row .cx-input-prefix { justify-self: start; width: 128px; height: 32px; padding: 0 12px; border-color: #676b6f; border-radius: 4px; justify-content: space-between; }
+.placement-row .cx-input-prefix:focus-within { border-color: #0053ca; box-shadow: 0 0 0 2px rgba(0, 83, 202, 0.2); }
+.placement-row .cx-input-prefix input { width: 100%; min-width: 0; font-size: 14px; }
 .settings-savebar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 14px 12px; position: sticky; bottom: 0; background: #fff; border-top: 1px solid #ececec; }
 .settings-saved { color: var(--c-success); font-size: 13px; }
 .cx-select-chip { min-width: 200px; background: var(--c-chip); border-color: transparent; border-radius: 999px; }

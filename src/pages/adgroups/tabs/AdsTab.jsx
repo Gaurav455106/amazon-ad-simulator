@@ -1,16 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Search, ListFilter, ChevronDown, X, ExternalLink } from 'lucide-react';
-import Info from '../../../components/console/InfoGlyph';
+import { X, ExternalLink, Search } from 'lucide-react';
 import { useStore } from '../../../store/useStore';
 import { useConsoleRange } from '../../../hooks/useConsoleRange';
 import { rangeMetrics, withParentStart } from '../../../utils/performance';
-import { formatMetric, METRICS } from '../../../components/console/metrics';
 import ProductImage from '../../../components/console/ProductImage';
-import TableDateButton from '../../../components/console/TableDateButton';
+import ConsoleTable from '../../../components/console/table/ConsoleTable';
+import { ActiveSwitch } from '../../../components/console/table/InlineEdit';
+import { GROUPS, metricColumns, metricFilterFields } from '../../../components/console/table/columns';
+import { DEFAULT_STATUS_FILTER, statusField } from '../../../components/console/table/tableFilters';
 import ProductLink from '../../../components/console/ProductLink';
 
 const PRODUCT_COLUMNS = ['spend', 'orders', 'sales', 'roas', 'impressions', 'clicks'];
+const PRODUCT_EXTRA = ['ctr', 'cpc', 'acos'];
 const SB_COLUMNS = ['clicks', 'dpv', 'spend', 'orders', 'sales'];
+const SB_EXTRA = ['impressions', 'ctr', 'cpc', 'acos', 'roas'];
+const RATIO_METRICS = ['ctr', 'cpc', 'acos', 'roas'];
 
 function AddProductsModal({ existing, onClose, onSave }) {
   const products = useStore(s => s.products);
@@ -67,7 +71,6 @@ export default function AdsTab({ campaign, adGroup }) {
   const products = useStore(s => s.products);
   const updateAdGroup = useStore(s => s.updateAdGroup);
   const range = useConsoleRange();
-  const [query, setQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   const isSB = campaign.type === 'Sponsored Brands';
@@ -75,98 +78,91 @@ export default function AdsTab({ campaign, adGroup }) {
   const asins = useMemo(() => adGroup.products || [], [adGroup.products]);
   const paused = adGroup.pausedProducts || [];
   const agMetrics = rangeMetrics(withParentStart(adGroup, campaign), range);
+  const isLive = campaign.status === 'Enabled' && adGroup.status === 'Enabled';
 
-  // Split ad group performance across its product ads by a stable per-ASIN share.
+  // Split ad group performance across its product ads by a stable per-ASIN share (ratios stay the ad group's).
   const rows = useMemo(() => {
     const weights = asins.map((a, i) => 1 + ((a.charCodeAt(a.length - 1) + i) % 5) / 4);
     const total = weights.reduce((x, y) => x + y, 0) || 1;
-    return asins
-      .map((asin, i) => ({ asin, product: products.find(p => p.asin === asin), share: weights[i] / total }))
-      .filter(r => !query || `${r.product?.name} ${r.asin}`.toLowerCase().includes(query.toLowerCase()));
-  }, [asins, products, query]);
+    return asins.map((asin, i) => {
+      const share = weights[i] / total;
+      const isOn = !paused.includes(asin);
+      const m = Object.fromEntries(Object.entries(agMetrics).map(([k, v]) => [k, RATIO_METRICS.includes(k) ? v : v * share]));
+      return { asin, product: products.find(p => p.asin === asin), isOn, m };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asins, products, paused.join(), agMetrics.spend, agMetrics.impressions]);
 
-  const shareOf = (share) => Object.fromEntries(PRODUCT_COLUMNS.map(k => [k, ['roas'].includes(k) ? agMetrics[k] : agMetrics[k] * share]));
   const toggleProduct = (asin) => updateAdGroup(adGroup.id, {
     pausedProducts: paused.includes(asin) ? paused.filter(a => a !== asin) : [...paused, asin],
   });
+  const adStatus = (r) => (!isLive || !r.isOn ? 'Paused' : r.product?.status === 'Out of stock' ? 'Out of stock' : 'Delivering');
 
   if (isSB) {
     const creative = campaign.sbCreative || {};
+    const sbRows = [{ id: adGroup.id, m: agMetrics }];
+    const columns = [
+      { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: () => adGroup.status,
+        cell: () => <ActiveSwitch isOn={adGroup.status === 'Enabled'} onToggle={() => updateAdGroup(adGroup.id, { status: adGroup.status === 'Enabled' ? 'Paused' : 'Enabled' })} /> },
+      { key: 'name', label: 'Ad name', fixed: true, csv: () => creative.headline || adGroup.name,
+        cell: () => <><span className="cx-cell-box">{creative.headline || adGroup.name}</span><br /><button type="button" className="cx-link">Manage ad</button></> },
+      { key: 'status', label: 'Status', group: GROUPS.settings, csv: () => (isLive ? 'Delivering' : 'Paused'), cell: () => (isLive ? 'Delivering' : 'Paused') },
+      { key: 'landing', label: 'Landing page', group: GROUPS.detail, csv: () => 'Store', cell: () => <span className="cx-link">View landing page <ExternalLink size={12} /></span> },
+      ...metricColumns([...SB_COLUMNS, ...SB_EXTRA], SB_COLUMNS),
+    ];
     return (
-      <>
-        <div className="cx-toolbar">
-          <button type="button" className="cx-btn cx-btn-pill">Create ad</button>
-          <button type="button" className="cx-tool-btn">Filter by <ChevronDown size={14} /></button>
-          <span className="cx-toolbar-spacer" />
-          <button type="button" className="cx-tool-btn">Columns <ChevronDown size={14} /></button>
-          <TableDateButton />
-          <button type="button" className="cx-tool-btn">Export</button>
-        </div>
-        <div className="cx-table-wrap">
-          <table className="cx-table">
-            <thead><tr><th>Active</th><th>Ad name</th><th>Status</th><th>Landing page</th>{SB_COLUMNS.map(k => <th key={k} className="is-num">{METRICS[k].label} <Info size={13} /></th>)}</tr></thead>
-            <tbody>
-              <tr>
-                <td><button type="button" className={`cx-switch ${adGroup.status === 'Enabled' ? 'is-on' : ''}`} aria-label={adGroup.status}
-                  onClick={() => updateAdGroup(adGroup.id, { status: adGroup.status === 'Enabled' ? 'Paused' : 'Enabled' })} /></td>
-                <td><span className="cx-cell-box">{creative.headline || adGroup.name}</span><br /><button type="button" className="cx-link">Manage ad</button></td>
-                <td>{campaign.status === 'Enabled' && adGroup.status === 'Enabled' ? 'Delivering' : 'Paused'}</td>
-                <td><span className="cx-link">View landing page <ExternalLink size={12} /></span></td>
-                {SB_COLUMNS.map(k => <td key={k} className="is-num">{agMetrics[k] ? formatMetric(k, agMetrics[k]) : '—'}</td>)}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </>
+      <ConsoleTable tableKey="sb-ads" exportName={`${adGroup.name} ads`} columns={columns} rows={sbRows} rowKey={r => r.id}
+        filterFields={metricFilterFields([...SB_COLUMNS, ...SB_EXTRA])} paginate={false}
+        leftActions={<button type="button" className="cx-btn cx-btn-pill">Create ad</button>} />
     );
   }
 
+  const columns = [
+    { key: 'active', label: 'Active status', header: 'Active', fixed: true, csv: r => (r.isOn ? 'Enabled' : 'Paused'),
+      cell: r => <ActiveSwitch isOn={r.isOn} onToggle={() => toggleProduct(r.asin)} /> },
+    { key: 'name', label: 'Ad name', fixed: true, info: true, csv: r => r.product?.name || r.asin,
+      cell: r => (
+        <div className="prod-row">
+          <ProductImage product={r.product} size={40} />
+          <ProductLink asin={r.asin} className="cx-link prod-title">{r.product?.name || r.asin}</ProductLink>
+        </div>
+      ) },
+    { key: 'status', label: 'Status', group: GROUPS.settings, info: true, csv: adStatus, cell: adStatus },
+    { key: 'sku', label: 'SKU/ASIN', group: GROUPS.detail, csv: r => `${r.product?.sku || ''} ${r.asin}`.trim(), cell: r => <>{r.product?.sku || '—'}<span className="cx-sub">{r.asin}</span></> },
+    ...metricColumns([...PRODUCT_COLUMNS, ...PRODUCT_EXTRA], PRODUCT_COLUMNS),
+  ];
+  const bulkSections = (sel, clear) => {
+    const setPaused = (isPaused) => {
+      const picked = sel.map(r => r.asin);
+      const next = isPaused ? [...new Set([...paused, ...picked])] : paused.filter(a => !picked.includes(a));
+      updateAdGroup(adGroup.id, { pausedProducts: next });
+      clear();
+    };
+    return [{ title: 'Quick Actions', items: [
+      { label: 'Enable', disabled: sel.every(r => r.isOn), onClick: () => setPaused(false) },
+      { label: 'Pause', disabled: sel.every(r => !r.isOn), onClick: () => setPaused(true) },
+    ] }];
+  };
+
   return (
     <>
-      <div className="cx-toolbar">
-        <button type="button" className={isSD ? 'cx-btn cx-btn-pill' : 'cx-btn cx-btn-primary'} onClick={() => setIsAdding(true)}>
-          {isSD ? 'Add products to advertise' : 'Add products'}
-        </button>
-        <label className="cx-search" style={{ width: 240 }}>
-          <Search size={16} /><input placeholder={isSD ? 'Find a product' : 'Search ads'} value={query} onChange={e => setQuery(e.target.value)} />
-        </label>
-        <button type="button" className="cx-tool-btn" aria-label="Filter by"><ListFilter size={16} /></button>
-        <span className="cx-toolbar-spacer" />
-        <button type="button" className="cx-tool-btn">View: Default <ChevronDown size={14} /></button>
-        <button type="button" className="cx-tool-btn">Columns <ChevronDown size={14} /></button>
-        <TableDateButton />
-        <button type="button" className="cx-tool-btn">Export</button>
-      </div>
-      <div className="cx-table-wrap">
-        <table className="cx-table">
-          <thead>
-            <tr><th><input type="checkbox" aria-label="Select all" /></th><th>Active</th><th>Ad name <Info size={13} /></th><th>Status <Info size={13} /></th><th>SKU/ASIN</th>
-              {PRODUCT_COLUMNS.map(k => <th key={k} className="is-num"><Info size={13} /> {METRICS[k].label}</th>)}</tr>
-          </thead>
-          <tbody>
-            {rows.map(({ asin, product, share }) => {
-              const isOn = !paused.includes(asin);
-              const m = shareOf(share);
-              return (
-                <tr key={asin}>
-                  <td><input type="checkbox" aria-label="select" /></td>
-                  <td><button type="button" className={`cx-switch ${isOn ? 'is-on' : ''}`} aria-label={isOn ? 'Enabled' : 'Paused'} onClick={() => toggleProduct(asin)} /></td>
-                  <td>
-                    <div className="prod-row">
-                      <ProductImage product={product} size={40} />
-                      <span className="cx-link prod-title">{product?.name || asin}</span>
-                    </div>
-                  </td>
-                  <td>{campaign.status !== 'Enabled' || adGroup.status !== 'Enabled' || !isOn ? 'Paused' : product?.status === 'Out of stock' ? 'Out of stock' : 'Delivering'}</td>
-                  <td>{product?.sku || '—'}<span className="cx-sub">{asin}</span></td>
-                  {PRODUCT_COLUMNS.map(k => <td key={k} className="is-num">{m[k] ? formatMetric(k, m[k]) : '—'}</td>)}
-                </tr>
-              );
-            })}
-            {rows.length === 0 && <tr><td colSpan={11}><div className="cx-empty"><h3>No ads</h3><p>Add products to start advertising in this ad group.</p></div></td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <ConsoleTable
+        tableKey={isSD ? 'sd-ads' : 'sp-ads'}
+        exportName={`${adGroup.name} ads`}
+        columns={columns}
+        rows={rows}
+        rowKey={r => r.asin}
+        filterFields={[statusField(r => (r.isOn ? 'Enabled' : 'Paused')), ...metricFilterFields([...PRODUCT_COLUMNS, ...PRODUCT_EXTRA])]}
+        initialFilters={[DEFAULT_STATUS_FILTER]}
+        search={{ placeholder: isSD ? 'Find a product' : 'Search ads', match: (r, q) => `${r.product?.name} ${r.asin} ${r.product?.sku}`.toLowerCase().includes(q) }}
+        leftActions={(
+          <button type="button" className={isSD ? 'cx-btn cx-btn-pill' : 'cx-btn cx-btn-primary'} onClick={() => setIsAdding(true)}>
+            {isSD ? 'Add products to advertise' : 'Add products'}
+          </button>
+        )}
+        bulkSections={bulkSections}
+        empty={<div className="cx-empty"><h3>No ads</h3><p>Add products to start advertising in this ad group.</p></div>}
+      />
       {isAdding && <AddProductsModal existing={asins} onClose={() => setIsAdding(false)} onSave={(added) => updateAdGroup(adGroup.id, { products: [...asins, ...added] })} />}
     </>
   );
